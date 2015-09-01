@@ -1,0 +1,8 @@
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/adaptiveIntegration.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/debug.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/distclean.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/info.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/release.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/run.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/runclean.dir
+/home/lisa/Desktop/dealii/examples/myCodes/adaptiveIntegration/CMakeFiles/strip_comments.dir

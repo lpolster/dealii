@@ -1,0 +1,1 @@
+/usr/bin/c++        -rdynamic -pthread -ggdb CMakeFiles/adaptiveIntegration.dir/adaptiveIntegration.cc.o  -o adaptiveIntegration -rdynamic /home/lisa/Desktop/dealii/lib/libdeal_II.g.so.8.4.pre /usr/lib/liblapack.so.3gf /usr/lib/libblas.so.3gf -lm -lquadmath -lc -ldl -lz -lrt -Wl,-rpath,/home/lisa/Desktop/dealii/lib 
