@@ -26,6 +26,7 @@
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
+#include <deal.II/lac/compressed_sparsity_pattern.h>
 
 using namespace dealii;
 
@@ -40,11 +41,22 @@ public:
     void run ();
 
 private:
+
+    static bool
+    cell_is_in_physical_domain (const typename DoFHandler<dim>::cell_iterator &cell);
+    static bool
+    cell_is_in_fictitious_domain (const typename DoFHandler<dim>::cell_iterator &cell);
+    static bool
+    cell_is_cut_by_boundary (const typename DoFHandler<dim>::cell_iterator &cell);
+
     void setup_system ();
-    void assemble_system ();
+    void assemble_system (const float length, const float height);
     void solve ();
     void refine_grid ();
-    void output_results (const unsigned int cycle) const;
+    void output_results ();
+    void set_material_ids(DoFHandler<dim> &dof_handler, const float length, const float height);
+    void add_constraints_on_interface(DoFHandler<dim> &dof_handler, FE_Q<dim> &fe, ConstraintMatrix &constraints);
+    void write_solution_to_file (Vector<double> solution);
 
     Triangulation<dim>   triangulation;
     Triangulation<dim>   triangulation_adaptiveIntegration;
@@ -54,13 +66,40 @@ private:
     FE_Q<dim>            fe;
     FE_Q<dim>            fe_adaptiveIntegration;
 
+    ConstraintMatrix     constraints;
+
     SparsityPattern      sparsity_pattern;
     SparseMatrix<double> system_matrix;
 
     Vector<double>       solution;
     Vector<double>       system_rhs;
+
+    enum
+    {
+        physical_domain_id,
+        fictitious_domain_id,
+        boundary_domain_id
+    };
+
 };
 
+template <int dim>
+bool Step6<dim>::cell_is_in_physical_domain (const typename DoFHandler<dim>::cell_iterator &cell)
+{
+    return (cell->material_id() == physical_domain_id);
+}
+
+template <int dim>
+bool Step6<dim>::cell_is_in_fictitious_domain (const typename DoFHandler<dim>::cell_iterator &cell)
+{
+    return (cell->material_id() == fictitious_domain_id);
+}
+
+template <int dim>
+bool Step6<dim>::cell_is_cut_by_boundary (const typename DoFHandler<dim>::cell_iterator &cell)
+{
+    return (cell->material_id() == boundary_domain_id);
+}
 
 template <int dim>
 class Coefficient : public Function<dim>
@@ -68,30 +107,17 @@ class Coefficient : public Function<dim>
 public:
     Coefficient () : Function<dim>() {}
 
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
-
     virtual void value_list (const std::vector<Point<dim> > &points,
                              std::vector<double>            &values,
+                             const float length, const float height,
                              const unsigned int              component = 0) const;
 };
-
-
-template <int dim>
-double Coefficient<dim>::value (const Point<dim> &p,
-                                const unsigned int) const
-{
-    if (p.square() >= 0.8*0.8)
-        return 0.00000001;
-    else
-        return 1;
-}
-
 
 template <int dim>
 void Coefficient<dim>::value_list (const std::vector<Point<dim> > &points,
                                    std::vector<double>            &values,
-                                   const unsigned int              component) const
+                                   const float length, const float height,
+                                   const unsigned int             component) const
 {
     const unsigned int n_points = points.size();
 
@@ -103,10 +129,10 @@ void Coefficient<dim>::value_list (const std::vector<Point<dim> > &points,
 
     for (unsigned int i=0; i<n_points; ++i)
     {
-        if (points[i].square() >= 0.8*0.8)
-            values[i] = 0.00000001;
+        if (points[i](0) <= length/2 && points[i](0) >= -length/2 && points[i](1) <= height/2 && points[i](1) >= -height/2)
+            values[i] = 1;
         else
-            values[i] = 1; //0.00000001
+            values[i] = 1e-8; //1e-8
     }
 }
 
@@ -127,6 +153,45 @@ Step6<dim>::~Step6 ()
 }
 
 template <int dim>
+void Step6<dim>::add_constraints_on_interface(DoFHandler<dim> &dof_handler, FE_Q<dim> &fe, ConstraintMatrix &constraints)
+{
+    std::vector<types::global_dof_index> local_face_dof_indices (fe.dofs_per_face);
+    for (typename DoFHandler<dim>::active_cell_iterator
+         cell = dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell)
+        if (cell_is_in_physical_domain (cell))
+        {
+//            std::cout<<"Cell "<<cell<<" is in physical domain."<<std::endl;
+            for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+                if (!cell->at_boundary(f))
+                {
+                    bool face_is_on_interface = false;
+                    if ((cell->neighbor(f)->has_children() == false)
+                            &&
+                            (cell_is_cut_by_boundary (cell->neighbor(f))))
+                        face_is_on_interface = true;
+                    else if (cell->neighbor(f)->has_children() == true)
+                    {
+                        for (unsigned int sf=0; sf<cell->face(f)->n_children(); ++sf)
+                            if (cell_is_cut_by_boundary (cell->neighbor_child_on_subface
+                                                              (f, sf)))
+                            {
+                                face_is_on_interface = true;
+                                break;
+                            }
+                    }
+                    if (face_is_on_interface)
+                    {
+                        cell->face(f)->get_dof_indices (local_face_dof_indices, 0);
+                        for (unsigned int i=0; i<local_face_dof_indices.size(); ++i)
+                            if (fe.face_system_to_component_index(i).first < dim)
+                                constraints.add_line (local_face_dof_indices[i]);
+                    }
+                }
+        }
+}
+
+template <int dim>
 void Step6<dim>::setup_system ()
 {
     dof_handler.distribute_dofs (fe);
@@ -135,15 +200,28 @@ void Step6<dim>::setup_system ()
     solution.reinit (dof_handler.n_dofs());
     system_rhs.reinit (dof_handler.n_dofs());
 
-    DynamicSparsityPattern dsp(dof_handler.n_dofs());
-    DoFTools::make_sparsity_pattern(dof_handler, dsp);
+    constraints.clear ();
+    DoFTools::make_hanging_node_constraints (dof_handler,
+                                             constraints);
+    VectorTools::interpolate_boundary_values (dof_handler,
+                                              0,
+                                              ZeroFunction<dim>(),
+                                              constraints);
+    add_constraints_on_interface(dof_handler, fe, constraints);
+    constraints.close ();
 
-    sparsity_pattern.copy_from(dsp);
+    CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+    DoFTools::make_sparsity_pattern(dof_handler,
+                                    c_sparsity,
+                                    constraints,
+                                    /*keep_constrained_dofs = */ false);
+    sparsity_pattern.copy_from(c_sparsity);
+
     system_matrix.reinit (sparsity_pattern);
 }
 
 template <int dim>
-void Step6<dim>::assemble_system ()
+void Step6<dim>::assemble_system (const float length, const float height)
 {
     const QGauss<dim>  quadrature_formula(2); // (p+1) quadrature points (p = polynomial degree)
     FEValues<dim> fe_values (fe_adaptiveIntegration, quadrature_formula,
@@ -173,58 +251,59 @@ void Step6<dim>::assemble_system ()
         fe_values_solutionGrid.reinit(solution_cell);
         for (; cell!=endc; ++cell)                                            // loop over all active cells
         {
-            if (solution_cell->vertex(0)[0] <= cell->vertex(0)[0] && solution_cell->vertex(1)[0] >= cell->vertex(1)[0]
-                    && solution_cell->vertex(0)[1] <= cell->vertex(0)[1] && solution_cell->vertex(3)[1] >= cell->vertex(3)[1])
+            if ( !cell_is_in_fictitious_domain(cell) && (solution_cell->vertex(0)[0] <= cell->vertex(0)[0] && solution_cell->vertex(1)[0] >= cell->vertex(1)[0]
+                    && solution_cell->vertex(0)[1] <= cell->vertex(0)[1] && solution_cell->vertex(3)[1] >= cell->vertex(3)[1]))
             {
                 refinement_level = (cell->level()) - (solution_cell->level());
                 fe_values.reinit (cell);
                 coefficient.value_list (fe_values.get_quadrature_points(),
-                                                      coefficient_values);
+                                        coefficient_values, length, height);
                 for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
+                    //                    std::cout<<"Quadrature point = "<< fe_values.get_quadrature_points()[q_index]<<", Value = "
+                    //                            << coefficient_values[q_index] <<std::endl;
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
 
                             cell_matrix(i,j) += (coefficient_values[q_index] * fe_values.shape_grad(i,q_index) *
                                                  fe_values.shape_grad(j,q_index) *
-                                                 fe_values.JxW(q_index)/(pow(4,refinement_level)));
+                                                 fe_values.JxW(q_index))/pow((dim-1)*4,refinement_level); //* fe_values_solutionGrid.JxW(q_index)
+//                            std::cout<<"cell_matrix("<<i<<", "<<j<<") = "<< cell_matrix(i,j)<<std::endl;
                         }
                         cell_rhs(i) += (coefficient_values[q_index] * fe_values.shape_value(i,q_index) *           // the cell right hand side
                                         1.0 *
                                         fe_values.JxW(q_index));
                     }
+//                    std::cout<<"fe_values.JxW(q_index) = "<<fe_values.JxW(q_index)<<std::endl;
+//                    std::cout<<"fe_values_solutionGrid.JxW(q_index) = "<<fe_values_solutionGrid.JxW(q_index)<<std::endl;
                 }
             }
         }
-        solution_cell-> get_dof_indices (local_dof_indices);              // return the global indices of the degrees of freedom located on this object
-        std::ofstream ofs;
-        ofs.open ("Values", std::ofstream::out | std::ofstream::app);
-        ofs << "Solution cell: " << solution_cell << std::endl;
-        ofs.close();
+        std::ofstream ofs_cell_matrix;
+        ofs_cell_matrix.open ("cell_matrices", std::ofstream::out | std::ofstream::app); // In case we want to append | std::ofstream::app
+        ofs_cell_matrix<<"Solution cell: "<<solution_cell<<std::endl;
+        cell_matrix.print(ofs_cell_matrix);
+        ofs_cell_matrix<<"----------------------------------------------"<<std::endl;
+        ofs_cell_matrix.close();
 
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-            for (unsigned int j=0; j<dofs_per_cell; ++j){
-                system_matrix.add (local_dof_indices[i],                      // add contribution of cell to system matix
-                                   local_dof_indices[j],
-                                   cell_matrix(i,j));
-                ofs.open ("Values", std::ofstream::out | std::ofstream::app);
-                ofs << local_dof_indices[i] << " " << local_dof_indices[j] << " " << cell_matrix(i,j) << std::endl;
-                ofs.close();
-            }
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-        {
-            system_rhs(local_dof_indices[i]) += cell_rhs(i);                // add contribution of cell to right hand side
-        }
-        std::map<types::global_dof_index,double> boundary_values;
-        VectorTools::interpolate_boundary_values (dof_handler,
-                                                  0,
-                                                  ZeroFunction<2>(),
-                                                  boundary_values);
-        MatrixTools::apply_boundary_values (boundary_values,
-                                            system_matrix,
-                                            solution,
-                                            system_rhs);
+        solution_cell-> get_dof_indices (local_dof_indices);              // return the global indices of the degrees of freedom located on this object
+
+        constraints.distribute_local_to_global (cell_matrix,
+                                                cell_rhs,
+                                                local_dof_indices,
+                                                system_matrix,
+                                                system_rhs);
+
         cell = dof_handler_adaptiveIntegration.begin_active();
     }
+    std::ofstream ofs_system_matrix;
+    ofs_system_matrix.open ("system_matrix", std::ofstream::out); // In case we want to append | std::ofstream::app
+    system_matrix.print_formatted(ofs_system_matrix,2, false);
+    ofs_system_matrix.close();
+
+    std::ofstream ofs_system_rhs;
+    ofs_system_rhs.open ("system_rhs", std::ofstream::out); // In case we want to append | std::ofstream::app
+    system_rhs.print(ofs_system_rhs,2,false,true);
+    ofs_system_rhs.close();
 }
 
 
@@ -238,11 +317,15 @@ void Step6<dim>::solve ()
     preconditioner.initialize(system_matrix, 1.2);
 
     solver.solve (system_matrix, solution, system_rhs,
-                  preconditioner);
-//    for(unsigned int i = 0; i<solution.size(); ++i)
-//        std::cout<<solution(i)<<std::endl;
-}
+                  PreconditionIdentity());
 
+    constraints.distribute (solution);
+
+    std::ofstream ofs;
+    ofs.open ("solution", std::ofstream::out);
+    solution.print(ofs, 2, false, true);
+    ofs.close();
+}
 
 template <int dim>
 void Step6<dim>::refine_grid ()
@@ -251,7 +334,6 @@ void Step6<dim>::refine_grid ()
     Vector<float> contains_boundary (triangulation_adaptiveIntegration.n_active_cells());
     contains_boundary = 0;
     unsigned int i = 0; // integer for accessing the right cell
-    unsigned int counter; // integer to count the numer of vertices that are located in the physical domain
 
     typename DoFHandler<dim>::active_cell_iterator // an iterator over all active cells
             cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
@@ -259,31 +341,12 @@ void Step6<dim>::refine_grid ()
 
     for (; cell!=endc; ++cell) // loop over all active cells
     {
-        counter = 0; // the counter is set to zero
-        //std::cout<<cell<<std::endl; // prints what cell we are currently in
-
-        // We loop over all 4 vertices (0-3) of the current cell. Vertex n of a cell is accessed by cell->vertex(n).
-        // The x and y coordinate of a vertex are accessed by cell->vertex(n)[0] and cell->vertex(n)[1].
-        // The if-statement test whether the vertex is located within a radius of 1.0, i.e. the physical domain.
-        // The amount of vertices of a cell that are located in the physical domain are counter (increment counter).
-        for (unsigned int vertex_iterator = 0; vertex_iterator < 4; vertex_iterator ++){
-            if ((cell->vertex(vertex_iterator).square()) < 0.8 * 0.8){
-                counter ++;
-            }
-        }
-
-        // If the counter of vertices of a cell equals 0, the cell is located completely in the fictitious domain.
-        // If the counter of vertices of a cell equals 4, the cell is located completely inside the physical domain.
-        // Values in the interval [1,3] indicate that the boundary cuts through the cell.
-        if (counter == 0)
-            contains_boundary[i] = 0.0;
-        else if (counter == 4)
-            contains_boundary[i] = 0.5;
-        else
+        if (cell_is_cut_by_boundary(cell))
+        {
             contains_boundary[i] = 1.0;
-
-        //std::cout<<counter<<std::endl; // print the value of counter
-        //std::cout<<contains_boundary[i]<<std::endl; // print the value that indicates whether cell contains boundary
+        }
+        else
+            contains_boundary[i] = 0.0;
         i++;
     }
 
@@ -292,28 +355,19 @@ void Step6<dim>::refine_grid ()
 }
 
 template <int dim>
-void Step6<dim>::output_results (const unsigned int cycle) const
+void Step6<dim>::output_results ()
 {
-    Assert (cycle < 4, ExcNotImplemented());
-
-    std::string filename_integrationGrid = "integration_grid-";
-    filename_integrationGrid += ('0' + cycle);
+    std::string filename_integrationGrid = "integration_grid";
     filename_integrationGrid += ".eps";
-
     std::ofstream output_integrationGrid (filename_integrationGrid.c_str());
     GridOut grid_out_integrationGrid;
     grid_out_integrationGrid.write_eps (triangulation_adaptiveIntegration, output_integrationGrid);
 
-    std::string filename_solutionGrid = "solution_grid-";
-    filename_solutionGrid += ('0' + cycle);
+    std::string filename_solutionGrid = "solution_grid";
     filename_solutionGrid += ".eps";
-
     std::ofstream output_solutionGrid (filename_solutionGrid.c_str());
-
     GridOut grid_out_solutionGrid;
     grid_out_solutionGrid.write_eps (triangulation, output_solutionGrid);
-
-    /* From step 3*/
 
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
@@ -328,37 +382,63 @@ void Step6<dim>::output_results (const unsigned int cycle) const
 }
 
 template <int dim>
-void Step6<dim>::run ()
+void Step6<dim>::set_material_ids(DoFHandler<dim> &dof_handler,const float length, const float height)
 {
-    for (unsigned int cycle=0; cycle<4; ++cycle)
+    for (typename Triangulation<dim>::active_cell_iterator
+         cell = dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell)
     {
-        std::cout << "Cycle " << cycle << ':' << std::endl;
-
-        if (cycle == 0)
+        unsigned int counter = 0;
+        for (unsigned int vertex_iterator = 0; vertex_iterator < 4; vertex_iterator ++){
+            if (cell->vertex(vertex_iterator)[0] <= (length/2) && cell->vertex(vertex_iterator)[0] >= -(length/2)
+                    && cell->vertex(vertex_iterator)[1] <= (height/2) && cell->vertex(vertex_iterator)[1] >= -(height/2)){
+                counter ++;
+            }
+        }
+        if (counter == 4)
         {
-            GridGenerator::hyper_cube (triangulation, -1, 1);
-            GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1);
-            triangulation_adaptiveIntegration.refine_global (4);
-            triangulation.refine_global (4);
+            cell->set_material_id (physical_domain_id);
+//            std::cout<<"Setting material id of cell "<<cell<<" to "<<physical_domain_id<<std::endl;
+        }
+        else if (counter == 0)
+        {
+            cell->set_material_id (fictitious_domain_id);
+//            std::cout<<"Setting material id of cell "<<cell<<" to "<<fictitious_domain_id<<std::endl;
         }
         else
-            refine_grid ();
+        {
+            cell->set_material_id(boundary_domain_id);
+//            std::cout<<"Setting material id of cell "<<cell<<" to "<<boundary_domain_id<<std::endl;
+        }
+    }
+}
 
-        setup_system ();
-        assemble_system ();
-        solve ();
-        output_results (cycle);
+template <int dim>
+void Step6<dim>::run ()
+{
+    GridGenerator::hyper_cube (triangulation, -2, 2);
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2);
+    triangulation_adaptiveIntegration.refine_global (4);
+    triangulation.refine_global (4);
+
+    const float rectangle_length = 2.0, rectangle_height = 2.0;
+    set_material_ids(dof_handler_adaptiveIntegration,rectangle_length, rectangle_height);
+    set_material_ids(dof_handler,rectangle_length, rectangle_height);
+
+    const unsigned int refinement_cycles = 1;
+    for (unsigned int i = 0; i < refinement_cycles; i++)
+    {
+        refine_grid ();
+        set_material_ids(dof_handler_adaptiveIntegration, rectangle_length, rectangle_height);
     }
 
-    DataOut<dim> data_out;
-
-    data_out.attach_dof_handler (dof_handler);
-    data_out.add_data_vector (solution, "solution");
-    data_out.build_patches ();
-
-    std::ofstream output ("solution.gpl");
-    data_out.write_gnuplot (output);
+    setup_system ();
+    assemble_system (rectangle_length, rectangle_height);
+    solve ();
+    output_results ();
 }
+
+
 
 int main ()
 {
