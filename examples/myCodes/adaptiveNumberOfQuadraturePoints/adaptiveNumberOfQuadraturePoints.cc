@@ -189,15 +189,15 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
     endc = dof_handler_adaptiveIntegration.end();
     std::vector<Point<dim>> q_points;
     std::vector<double> q_weights;
-    double JxW;
-    double jacobian;
-    double temp;
     
     FEValues<dim> fe_values_temp (fe_adaptiveIntegration, *quadrature_formula, update_gradients | update_quadrature_points  |  update_JxW_values | update_jacobians);
-    
-    
+
+
     FEValues<dim> fe_values_solution_cell_temp (fe, *quadrature_formula, update_gradients | update_quadrature_points  |  update_JxW_values | update_jacobians);
-    
+
+    std::ofstream ofs_quadrature_points;
+    ofs_quadrature_points.open ("quadrature_points", std::ofstream::out | std::ofstream::app);
+
     if (cell_is_cut_by_boundary(solution_cell))
     {
         for(; cell!=endc; ++cell)
@@ -207,13 +207,13 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
                 
                 q_points.insert(q_points.end(),fe_values_temp.get_quadrature_points().begin(),
                                 fe_values_temp.get_quadrature_points().end());
+                //std::cout<<fe_values_temp.get_quadrature_points()[0][0]<<std::endl<<"_______________________"<<std::endl;
             }
+
         for (unsigned int i = 0; i<q_points.size(); ++i)
             q_weights.insert(q_weights.end(),1.0/q_points.size());
-        
-        return Quadrature<dim>(q_points, q_weights);
-        
     }
+
     else
     {   fe_values_solution_cell_temp.reinit(solution_cell);
         
@@ -221,9 +221,20 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
                         fe_values_solution_cell_temp.get_quadrature_points().end());
         q_weights.insert(q_weights.end(),fe_values_solution_cell_temp.get_quadrature().get_weights().begin(),
                          fe_values_solution_cell_temp.get_quadrature().get_weights().end());
-
-        return Quadrature<dim>(q_points, q_weights);
     }
+
+    for (unsigned int i = 0; i<q_points.size(); ++i)
+    {
+    ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
+    q_points[i][0] = (q_points[i][0]-solution_cell->vertex(0)[0])/(solution_cell->vertex(1)[0]-solution_cell->vertex(0)[0]);
+    q_points[i][1] = (q_points[i][1]-solution_cell->vertex(0)[1])/(solution_cell->vertex(2)[1]-solution_cell->vertex(0)[1]);
+
+    std::cout<<q_points[i]<<std::endl;
+    }
+
+    ofs_quadrature_points.close();
+
+    return Quadrature<dim>(q_points, q_weights);
 }
 
 template <int dim>
@@ -242,9 +253,6 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system (std::function<doubl
             solution_cell = dof_handler.begin_active(),        // iterator to first active cell of the solution grid
             solution_endc = dof_handler.end();               // iterator to the one past last active cell of the solution grid
     
-    std::ofstream ofs_quadrature_points;
-    ofs_quadrature_points.open ("quadrature_points", std::ofstream::out | std::ofstream::app);
-    
     for (; solution_cell!=solution_endc; ++solution_cell)
     {
         std::cout<<"Collect quadrature for solution_cell "<<solution_cell<<std::endl;
@@ -260,15 +268,6 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system (std::function<doubl
         
         value_list (fe_values.get_quadrature().get_points(),
                     coefficient_values, circle);
-        
-        for (unsigned int i = 0; i< n_q_points; ++i)
-        {
-            ofs_quadrature_points<<fe_values.get_quadrature().get_points()[i]<<" "<< coefficient_values[i]<<std::endl;
-            std::cout<<fe_values.get_quadrature().get_points()[i]<<std::endl;
-            std::cout<<fe_values.get_quadrature().get_weights()[i]<<std::endl;
-            
-        }
-        
         
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
             for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
@@ -297,7 +296,6 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system (std::function<doubl
                                             system_matrix,
                                             system_rhs);
     }
-    ofs_quadrature_points.close();
 
 }
 
