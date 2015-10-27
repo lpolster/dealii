@@ -58,13 +58,13 @@ private:
     void add_constraints_on_interface(DoFHandler<dim> &dof_handler, FE_Q<dim> &fe, ConstraintMatrix &constraints);
     void write_solution_to_file (Vector<double> solution);
 
-    Triangulation<dim>   triangulation;
-    Triangulation<dim>   triangulation_adaptiveIntegration;
+    Triangulation<dim>   triangulation; // triangulation for the solution grid
+    Triangulation<dim>   triangulation_adaptiveIntegration; // triangulation for the integration grid
 
-    DoFHandler<dim>      dof_handler;
-    DoFHandler<dim>      dof_handler_adaptiveIntegration;
-    FE_Q<dim>            fe;
-    FE_Q<dim>            fe_adaptiveIntegration;
+    DoFHandler<dim>      dof_handler; // dof handler for the solution grid
+    DoFHandler<dim>      dof_handler_adaptiveIntegration; // dof handler for the integration grid
+    FE_Q<dim>            fe; // fe for the solution grid
+    FE_Q<dim>            fe_adaptiveIntegration; // fe for the integration grid
 
     ConstraintMatrix     constraints;
 
@@ -130,9 +130,9 @@ void Coefficient<dim>::value_list (const std::vector<Point<dim> > &points,
     for (unsigned int i=0; i<n_points; ++i)
     {
         if (points[i](0) <= length/2 && points[i](0) >= -length/2 && points[i](1) <= height/2 && points[i](1) >= -height/2)
-            values[i] = 1;
+            values[i] = 1; // indicates physical domain
         else
-            values[i] = 1e-8; //1e-8
+            values[i] = 1e-8; // indicates fictitous domain
     }
 }
 
@@ -166,20 +166,21 @@ void Step6<dim>::add_constraints_on_interface(DoFHandler<dim> &dof_handler, FE_Q
                 if (!cell->at_boundary(f))
                 {
                     bool face_is_on_interface = false;
-                    if ((cell->neighbor(f)->has_children() == false)
-                            &&
-                            (cell_is_cut_by_boundary (cell->neighbor(f))))
-                        face_is_on_interface = true;
-                    else if (cell->neighbor(f)->has_children() == true)
-                    {
-                        for (unsigned int sf=0; sf<cell->face(f)->n_children(); ++sf)
-                            if (cell_is_cut_by_boundary (cell->neighbor_child_on_subface
-                                                              (f, sf)))
-                            {
-                                face_is_on_interface = true;
-                                break;
-                            }
-                    }
+//                    if ((cell->neighbor(f)->has_children() == false)
+//                            &&
+//                            (cell_is_cut_by_boundary (cell->neighbor(f))))
+//                        face_is_on_interface = true;
+//                    else if (cell->neighbor(f)->has_children() == true)
+//                    {
+//                        for (unsigned int sf=0; sf<cell->face(f)->n_children(); ++sf)
+//                            if (cell_is_cut_by_boundary (cell->neighbor_child_on_subface
+//                                                              (f, sf)))
+//                            {
+//                                face_is_on_interface = true;
+//                                break;
+//                            }
+//                    }
+                    if(cell_is_cut_by_boundary (cell->neighbor(f)) )face_is_on_interface = true;
                     if (face_is_on_interface)
                     {
                         cell->face(f)->get_dof_indices (local_face_dof_indices, 0);
@@ -418,19 +419,19 @@ void Step6<dim>::run ()
 {
     GridGenerator::hyper_cube (triangulation, -2, 2);
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2);
-    triangulation_adaptiveIntegration.refine_global (4);
-    triangulation.refine_global (4);
+    triangulation_adaptiveIntegration.refine_global (5);
+    triangulation.refine_global (5);
 
     const float rectangle_length = 2.0, rectangle_height = 2.0;
     set_material_ids(dof_handler_adaptiveIntegration,rectangle_length, rectangle_height);
     set_material_ids(dof_handler,rectangle_length, rectangle_height);
 
-    const unsigned int refinement_cycles = 1;
-    for (unsigned int i = 0; i < refinement_cycles; i++)
-    {
-        refine_grid ();
-        set_material_ids(dof_handler_adaptiveIntegration, rectangle_length, rectangle_height);
-    }
+//    const unsigned int refinement_cycles = 3;
+//    for (unsigned int i = 0; i < refinement_cycles; i++)
+//    {
+//        refine_grid ();
+//        set_material_ids(dof_handler_adaptiveIntegration, rectangle_length, rectangle_height);
+//    }
 
     setup_system ();
     assemble_system (rectangle_length, rectangle_height);

@@ -1,10 +1,10 @@
-FILE(REMOVE_RECURSE
+file(REMOVE_RECURSE
   "CMakeFiles/adaptiveIntegration.dir/adaptiveIntegration.cc.o"
   "adaptiveIntegration.pdb"
   "adaptiveIntegration"
 )
 
 # Per-language clean rules from dependency scanning.
-FOREACH(lang CXX)
-  INCLUDE(CMakeFiles/adaptiveIntegration.dir/cmake_clean_${lang}.cmake OPTIONAL)
-ENDFOREACH(lang)
+foreach(lang CXX)
+  include(CMakeFiles/adaptiveIntegration.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

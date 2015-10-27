@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/PenaltyMethodOnAdaptiveGrid.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/PenaltyMethodOnAdaptiveGrid/CMakeFiles/release.dir

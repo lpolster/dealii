@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/adaptiveNumberOfQuadraturePoints.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/adaptiveNumberOfQuadraturePoints/CMakeFiles/release.dir

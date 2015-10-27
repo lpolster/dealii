@@ -2,13 +2,15 @@ MESSAGE(
 "###
 #
 #  Project  adaptiveIntegration  set up with  deal.II-8.4.pre  found at
-#      /home/lisa/Desktop/dealii
+#      /Users/lisa/Desktop/dealii/build
 #
 #  CMAKE_BUILD_TYPE:          Debug
 #
 #  You can now run
 #       $ make                - to compile and link the program
 #       $ make run            - to (compile, link and) run the program
+#
+#       $ make sign           - to sign the executable with the supplied OSX developer key
 #
 #       $ make debug          - to switch the build type to 'Debug'
 #       $ make release        - to switch the build type to 'Release'
