@@ -49,21 +49,26 @@ private:
     cell_is_in_fictitious_domain (const typename DoFHandler<dim>::cell_iterator &cell);
     static bool
     cell_is_cut_by_boundary (const typename DoFHandler<dim>::cell_iterator &cell);
+    static bool
+    cell_is_child (const typename DoFHandler<dim>::cell_iterator &cell, const typename DoFHandler<dim>::cell_iterator &solution_cell);
 
     void setup_system ();
     void assemble_system ();
     void solve ();
     void refine_grid ();
     void output_results ();
+
+    void get_indicator_function_values(const std::vector<Point<dim> > &points, std::vector<double> &indicator_function_values, typename DoFHandler<dim>::cell_iterator solution_cell,
+                                                                              std::function<double(double, double)> f);
     void set_material_ids(DoFHandler<dim> &dof_handler, std::function<double(double, double)> f);
     std::vector<double> get_normal_vector(typename DoFHandler<dim>::cell_iterator cell, std::function<double(double, double)> f);
     std::vector<Point<dim>> get_boundary_quadrature_points(typename DoFHandler<dim>::cell_iterator cell, std::function<double(double, double)> f);
     dealii::Tensor<1,2,double> get_normal_vector_at_q_point(std::vector<std::vector<double>> normal_vectors_list, unsigned int q_index);
     void write_solution_to_file (Vector<double> solution);
-    void value_list (const std::vector<Point<dim> > &points,
-                     std::vector<double>            &values,
-                     std::function<double(double, double)> f,
-                     const unsigned int              component = 0) const;
+//    void value_list (const std::vector<Point<dim> > &points,
+//                     std::vector<double>            &values,
+//                     std::function<double(double, double)> f,
+//                     const unsigned int              component = 0) const;
     Quadrature<dim> collect_quadrature(typename DoFHandler<dim>::cell_iterator solution_cell,
                                        const Quadrature<dim>* quadrature_formula);
     Quadrature<dim> collect_quadrature_on_boundary(typename DoFHandler<dim>::cell_iterator solution_cell);
@@ -74,9 +79,9 @@ private:
     Triangulation<dim>   triangulation; // triangulation for the solution grid
     Triangulation<dim>   triangulation_adaptiveIntegration; // triangulation for the integration grid
 
-    DoFHandler<dim>      dof_handler; // dof handler for the solution grid
+    DoFHandler<dim>      dof_handler;   // dof handler for the solution grid
     DoFHandler<dim>      dof_handler_adaptiveIntegration; // dof handler for the integration grid
-    FE_Q<dim>            fe; // fe for the solution grid
+    FE_Q<dim>            fe;            // fe for the solution grid
     FE_Q<dim>            fe_adaptiveIntegration; // fe for the integration grid
 
     ConstraintMatrix     constraints;
@@ -84,8 +89,8 @@ private:
     SparsityPattern      sparsity_pattern;
     SparseMatrix<double> system_matrix;
 
-    Vector<double>       solution;
-    Vector<double>       system_rhs;
+    Vector<double>       solution;      // vector for the solution (coefficients of shape functions)
+    Vector<double>       system_rhs;    // vector for the right hand side
 
 
     enum
@@ -115,33 +120,59 @@ bool adaptiveNumberOfQuadraturePoints<dim>::cell_is_cut_by_boundary (const typen
     return (cell->material_id() == boundary_domain_id);
 }
 
+template <int dim>
+bool adaptiveNumberOfQuadraturePoints<dim>::cell_is_child (const typename DoFHandler<dim>::cell_iterator &cell, const typename DoFHandler<dim>::cell_iterator &solution_cell)
+{
+   return (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]
+           && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1]);
+}
+
 double circle (double x, double y)
 {
     return (x*x)+(y*y);
 }
 
 
+//template <int dim>
+//void adaptiveNumberOfQuadraturePoints<dim>::value_list (const std::vector<Point<dim> > &points, // identification function
+//                                                        std::vector<double>            &values,
+//                                                        std::function<double(double, double)> f,
+//                                                        const unsigned int             component) const
+//{
+//    const unsigned int n_points = points.size();
+
+//    Assert (values.size() == n_points,
+//            ExcDimensionMismatch (values.size(), n_points));
+
+//    Assert (component == 0,
+//            ExcIndexRange (component, 0, 1));
+
+//    for (unsigned int i=0; i<n_points; ++i)
+//    {
+//        if (f(points[i][0], points[i][1])  <= 0.4*0.4) // point is in physical domain (circle with radius 0.4)
+//            values[i] = 1; // indicates physical domain
+//        else
+//            values[i] = 1e-8; // indicates fictitous domain
+//    }
+//}
+
 template <int dim>
-void adaptiveNumberOfQuadraturePoints<dim>::value_list (const std::vector<Point<dim> > &points, // identification function
-                                                        std::vector<double>            &values,
-                                                        std::function<double(double, double)> f,
-                                                        const unsigned int             component) const
-{
-    const unsigned int n_points = points.size();
-
-    Assert (values.size() == n_points,
-            ExcDimensionMismatch (values.size(), n_points));
-
-    Assert (component == 0,
-            ExcIndexRange (component, 0, 1));
-
-    for (unsigned int i=0; i<n_points; ++i)
+void adaptiveNumberOfQuadraturePoints<dim>::get_indicator_function_values(const std::vector<Point<dim> > &points,
+                                                                          std::vector<double> &indicator_function_values,
+                                                                          typename DoFHandler<dim>::cell_iterator solution_cell,
+                                                                          std::function<double(double, double)> f)
+{   double x, y;
+    for (unsigned int i=0; i<indicator_function_values.size(); ++i)
     {
-        if (f(points[i][0], points[i][1])  <= 0.4*0.4) // point is in physical domain (circle with radius 0.4)
-            values[i] = 1; // indicates physical domain
+        x = points[i][0] * (solution_cell->vertex(1)[0]-solution_cell->vertex(0)[0]) + solution_cell->vertex(0)[0];
+        y = points[i][1] * (solution_cell->vertex(2)[1]-solution_cell->vertex(0)[1]) + solution_cell->vertex(0)[1];
+
+        if (f(x, y)  <= 0.4*0.4) // point is in physical domain (circle with radius 0.4)
+            indicator_function_values[i] = 1; // indicates physical domain
         else
-            values[i] = 1e-8; // indicates fictitous domain
+            indicator_function_values[i] = 1e-8; // indicates fictitous domain
     }
+
 }
 
 template <int dim>
@@ -173,10 +204,10 @@ void adaptiveNumberOfQuadraturePoints<dim>::setup_system ()
     constraints.clear ();
     DoFTools::make_hanging_node_constraints (dof_handler,
                                              constraints);
-    VectorTools::interpolate_boundary_values (dof_handler,
-                                              0,
-                                              ZeroFunction<dim>(),
-                                              constraints);
+//    VectorTools::interpolate_boundary_values (dof_handler,
+//                                              0,
+//                                              ZeroFunction<dim>(),
+//                                              constraints);
     constraints.close ();
 
     CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
@@ -201,7 +232,7 @@ std::vector<std::vector<double>> adaptiveNumberOfQuadraturePoints<dim>::collect_
 
     for(; cell!=endc; ++cell)
 
-        if (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]  && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1])
+        if (cell_is_child (cell, solution_cell))
         {
             if (cell_is_cut_by_boundary(cell))
             {
@@ -209,11 +240,6 @@ std::vector<std::vector<double>> adaptiveNumberOfQuadraturePoints<dim>::collect_
                normal_vector_list.push_back(normal_vector);
                normal_vector_list.push_back(normal_vector);
 
-            }
-            else
-            {
-                normal_vector_list.push_back({0,0});
-                normal_vector_list.push_back({0,0});
             }
         }
     return normal_vector_list;
@@ -238,11 +264,10 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature_on_bou
 
     for(; cell!=endc; ++cell)
 
-        if (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]  && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1])
+        if (cell_is_child(cell, solution_cell))
         {
             if (cell_is_cut_by_boundary(cell))
             {
-                //normal_vector = get_normal_vector(cell, circle);
                 boundary_q_points = get_boundary_quadrature_points(cell,circle);
 
                 // maps only to plot
@@ -250,7 +275,6 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature_on_bou
                 boundary_q_points[0][1] = boundary_q_points[0][1] * (cell->vertex(2)[1]-cell->vertex(0)[1]) + cell->vertex(0)[1];
                 boundary_q_points[1][0] = boundary_q_points[1][0] * (cell->vertex(1)[0]-cell->vertex(0)[0]) + cell->vertex(0)[0];
                 boundary_q_points[1][1] = boundary_q_points[1][1] * (cell->vertex(2)[1]-cell->vertex(0)[1]) + cell->vertex(0)[1];
-                //std::cout<<normal_vector[0]<<" "<<normal_vector[1]<<std::endl;
 
                 boundary_q_points_list.insert(boundary_q_points_list.end(), boundary_q_points.begin(), boundary_q_points.end());;
 
@@ -262,14 +286,6 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature_on_bou
                 boundary_q_weights.insert(boundary_q_weights.end(), 0.500);
 
             }
-            else
-            {
-                boundary_q_points_list.insert(boundary_q_points_list.end(), {0,0});
-                boundary_q_points_list.insert(boundary_q_points_list.end(), {0,0});
-                boundary_q_weights.insert(boundary_q_weights.end(), 0);
-                boundary_q_weights.insert(boundary_q_weights.end(), 0);
-            }
-
         }
 
     for (unsigned int i = 0; i<boundary_q_points_list.size(); ++i)
@@ -315,7 +331,7 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
         for(; cell!=endc; ++cell) // loop over all cells of the adaptive grid
 
             // find cells on adaptive grid that are located at the position on the cell in the solution grid
-            if (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]  && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1] )
+            if (cell_is_child(cell, solution_cell))
             {
                 fe_values_temp.reinit(cell); // reinitialize fe values on cell of adaptive grid
                 q_points.insert(q_points.end(),fe_values_temp.get_quadrature_points().begin(), // add the quadrature points of this cell to the vector of quadrature points
@@ -325,14 +341,14 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
 
                 refinement_level = cell->level() - solution_cell->level(); // calculate the level of refinement of the current cell relative to the solution grid
 
-                for (int i = 0; i < fe_values_temp.get_quadrature().size(); i++)
+                for (unsigned int i = 0; i < fe_values_temp.get_quadrature().size(); i++)
                 {
                     refinement_level_vec.insert(refinement_level_vec.end(),refinement_level); // add the refinement level of the current cell to the vector containing the refinement levels
                     refinement_level_vec.insert(refinement_level_vec.end(),refinement_level); // add the refinement level of the current cell to the vector containing the refinement levels
                 }
             }
 
-    } // if
+    } // endif
 
     else // if cell on solution grid is not cur by the boundary
     {
@@ -348,23 +364,22 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
             refinement_level_vec.insert(refinement_level_vec.end(),0);    // add the refinement level of the current cell to the vector containing the refinement levels
             refinement_level_vec.insert(refinement_level_vec.end(),0);    // add the refinement level of the current cell to the vector containing the refinement levels
 
-        }
+        } //endfor
 
-    } // else
+    } // endelse
 
     //    std::cout<<"-----------------------------------"<<std::endl;
     //    std::cout<<q_points.size()<<" "<<q_weights.size()<<std::endl;
 
     for (unsigned int i = 0; i<q_points.size(); ++i) // loop over all quadrature points
     {
+        q_weights[i] = q_weights[i]/pow(4,refinement_level_vec[i]); // caluclate weight of quadrature point such that the weights add up to 1
         ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<" "<<q_weights[i]<<std::endl;
-
 
         q_points[i][0] = (q_points[i][0] - solution_cell->vertex(0)[0]) / (solution_cell->vertex(1)[0] - solution_cell->vertex(0)[0]); // calculate x location of quadrature point on reference cell
         q_points[i][1] = (q_points[i][1] - solution_cell->vertex(0)[1]) / (solution_cell->vertex(2)[1] - solution_cell->vertex(0)[1]); // calculate y location of quadrature point on reference cell
-        q_weights[i] = q_weights[i]/pow(4,refinement_level_vec[i]); // caluclate weight of quadrature point such that the weights add up to 1
         //std::cout<<q_points[i]<<" "<<q_weights[i]<<std::endl;
-    }
+    } //endfor
 
     //std::cout<<std::accumulate(q_weights.begin(), q_weights.end(), 0.0)<<std::endl; // to check if sum of all weights is 1
 
@@ -376,55 +391,62 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
 template <int dim>
 void adaptiveNumberOfQuadraturePoints<dim>::assemble_system ()
 {
-    const QGauss<dim>  quadrature_formula(2); // (p+1) quadrature points (p = polynomial degree)
-    Quadrature<dim> collected_quadrature; // the quadrature rule
-    Quadrature<dim> collected_quadrature_on_boundary;
+    const QGauss<dim>  quadrature_formula(2);                   // (p+1) quadrature points (p = polynomial degree)
+    Quadrature<dim> collected_quadrature;                       // the quadrature rule
+    Quadrature<dim> collected_quadrature_on_boundary;           // quadrature rule on boundary
     std::vector<std::vector<double>> normal_vectors_list;
 
-    const unsigned int   dofs_per_cell = fe.dofs_per_cell; // degrees of freedom per cell on solution grid
-    const float beta = 0.10; // Wert?, generalisiertes Eigenwertproblem (teuer)
-    const float dirichlet_boundary_value = 0.000; // value for Dirichlet boundary condition
+    const unsigned int   dofs_per_cell = fe.dofs_per_cell;      // degrees of freedom per cell on solution grid
+    const float beta_h = 2.0/0.0625;                                    // beta divided by h, 2.0/0.0625
+    const float dirichlet_boundary_value = 0.000;               // value for Dirichlet boundary condition
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell); // initialize cell matrix
-    Vector<double>       cell_rhs (dofs_per_cell); // initialize cell rhs
+    Vector<double>       cell_rhs (dofs_per_cell);              // initialize cell rhs
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
     typename DoFHandler<dim>::active_cell_iterator
-            solution_cell = dof_handler.begin_active(),        // iterator to first active cell of the solution grid
-            solution_endc = dof_handler.end();               // iterator to the one past last active cell of the solution grid
+            solution_cell = dof_handler.begin_active(),         // iterator to first active cell of the solution grid
+            solution_endc = dof_handler.end();                  // iterator to the one past last active cell of the solution grid
 
     for (; solution_cell!=solution_endc; ++solution_cell) // loop over all cells on solution grid
     {
-        //std::cout<<"Collect quadrature for solution_cell "<<solution_cell<<std::endl;
-        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
-        FEValues<dim> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
-
         cell_matrix = 0;
         cell_rhs = 0;
 
-        fe_values.reinit(solution_cell); // reinitialize fe values on current cells
+        std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
 
-        unsigned int   n_q_points    = collected_quadrature.size(); // number of quadrature points
+        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
+        FEValues<dim> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
-        std::vector<double>    coefficient_values (n_q_points); // vector containing the coefficients for weighting of fictitious and physical domain
+        fe_values.reinit(solution_cell);                        // reinitialize fe values on current cells
 
-        value_list (fe_values.get_quadrature().get_points(),
-                    coefficient_values, circle);
+        unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
 
+        //std::vector<double> coefficient_values (n_q_points); // vector containing the coefficients for weighting of fictitious and physical domain
 
+        //value_list (fe_values.get_quadrature().get_points(),
+                    //coefficient_values, circle);
+        std::vector<double> indicator_function_values(n_q_points);
+        get_indicator_function_values(fe_values.get_quadrature().get_points(), indicator_function_values, solution_cell,
+                                                                  circle);
 
-        //  if (cell_is_in_fictitious_domain(solution_cell) == false)
+        std::cout<<"number of quadrature points: "<<n_q_points<<std::endl;
+
+        //if (cell_is_in_fictitious_domain(solution_cell) == false)
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
+
+            std::cout<<indicator_function_values[q_index]<<std::endl;
+
             for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
                 for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
 
                     cell_matrix(i,j) += (fe_values.shape_grad(i,q_index) * //
-                                         fe_values.shape_grad(j,q_index)  *// coefficient_values[q_index] *
+                                         fe_values.shape_grad(j,q_index)  * //indicator_function_values[q_index] *
                                          fe_values.JxW(q_index)); // *
-                    std::cout<<coefficient_values[q_index]<<std::endl;
+                    //std::cout<<coefficient_values[q_index]<<std::endl;
                     //if (cell_is_cut_by_boundary(solution_cell))
                     //cell_matrix(i,j) += beta * fe_values.shape_value(i,q_index) * fe_values.shape_value(j,q_index);
                 }
-                cell_rhs(i) += (fe_values.shape_value(i,q_index) *// coefficient_values[q_index] * // the cell rhs
+                cell_rhs(i) += (fe_values.shape_value(i,q_index) * //indicator_function_values[q_index] * // the cell rhs
                                 1.0 *
                                 fe_values.JxW(q_index));
                 //if (cell_is_cut_by_boundary(solution_cell))
@@ -435,55 +457,46 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system ()
 
 
 
+        if (cell_is_cut_by_boundary(solution_cell))
+        {
+            normal_vectors_list = collect_normal_vector_on_boundary(solution_cell);
+            collected_quadrature_on_boundary = collect_quadrature_on_boundary(solution_cell);
+            FEValues<dim> fe_values_on_boundary(fe, collected_quadrature_on_boundary, update_quadrature_points |  update_gradients | update_JxW_values | update_jacobians  |  update_values);
+            fe_values_on_boundary.reinit(solution_cell);
+            unsigned int   n_q_points_boundary    = collected_quadrature_on_boundary.size();
+            dealii::Tensor<1,2,double> normal_vector;
+//            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
+//            std::cout<<"Number of quadrature points: "<<n_q_points_boundary<<std::endl;
 
+//        // Nitsche Method
 
+                for (unsigned int q_index=0; q_index<n_q_points_boundary; ++q_index){      // loop over all quadrature points
+                    for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
+                        for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
 
+                            normal_vector = get_normal_vector_at_q_point(normal_vectors_list, q_index);
 
+                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(i,q_index) * //
+                                                 fe_values_on_boundary.shape_grad(j,q_index) * normal_vector *
+                                                 fe_values_on_boundary.JxW(q_index));
 
+                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(j,q_index) * //
+                                                 fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *
+                                                 fe_values_on_boundary.JxW(q_index));
 
+                            cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary.shape_value(i,q_index) * //
+                                                 fe_values_on_boundary.shape_value(j,q_index) *
+                                                 fe_values_on_boundary.JxW(q_index));
+                        }
+                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *// the cell rhs
+                                        fe_values_on_boundary.JxW(q_index));
+                        cell_rhs(i) +=  (beta_h * fe_values_on_boundary.shape_value(i,q_index) * //
+                                                 dirichlet_boundary_value *
+                                                 fe_values_on_boundary.JxW(q_index));
+                    }
 
-
-
-//        if (cell_is_cut_by_boundary(solution_cell))
-//        {
-//            normal_vectors_list = collect_normal_vector_on_boundary(solution_cell);
-//            collected_quadrature_on_boundary = collect_quadrature_on_boundary(solution_cell);
-//            FEValues<dim> fe_values_on_boundary(fe, collected_quadrature_on_boundary, update_quadrature_points |  update_gradients | update_JxW_values | update_jacobians  |  update_values);
-//            fe_values_on_boundary.reinit(solution_cell);
-//            unsigned int   n_q_points_boundary    = collected_quadrature_on_boundary.size();
-//            dealii::Tensor<1,2,double> normal_vector;
-////            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
-////            std::cout<<"Number of quadrature points: "<<n_q_points_boundary<<std::endl;
-
-////        // Nitsche Method
-
-//                for (unsigned int q_index=0; q_index<n_q_points_boundary; ++q_index){      // loop over all quadrature points
-//                    for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
-//                        for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
-
-//                            normal_vector = get_normal_vector_at_q_point(normal_vectors_list, q_index);
-
-//                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(i,q_index) * //
-//                                                 fe_values_on_boundary.shape_grad(j,q_index) * normal_vector *
-//                                                 fe_values_on_boundary.JxW(q_index));
-
-//                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(j,q_index) * //
-//                                                 fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *
-//                                                 fe_values_on_boundary.JxW(q_index));
-
-//                            cell_matrix(i,j) +=  beta * (fe_values_on_boundary.shape_value(i,q_index) * //
-//                                                 fe_values_on_boundary.shape_value(j,q_index) *
-//                                                 fe_values_on_boundary.JxW(q_index));
-//                        }
-////                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *// the cell rhs
-////                                        fe_values_on_boundary.JxW(q_index));
-////                        cell_rhs(i) +=  (beta * fe_values_on_boundary.shape_value(i,q_index) * //
-////                                                 dirichlet_boundary_value *
-////                                                 fe_values_on_boundary.JxW(q_index));
-//                    }
-
-//                }
-//        }
+                }
+        }
 
         solution_cell-> get_dof_indices (local_dof_indices);  // return the global indices of the dof located on this object
 
@@ -726,8 +739,8 @@ std::vector<double> adaptiveNumberOfQuadraturePoints<dim>::get_normal_vector(typ
 template <int dim>
 void adaptiveNumberOfQuadraturePoints<dim>::run ()
 {
-    GridGenerator::hyper_cube (triangulation, -0.5, 0.5);
-    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -0.5, 0.5);
+    GridGenerator::hyper_cube (triangulation, -1.0, 1.0);
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1.0, 1.0);
     triangulation_adaptiveIntegration.refine_global (5);
     triangulation.refine_global (5);
 
