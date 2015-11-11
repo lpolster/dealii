@@ -398,8 +398,6 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system ()
         get_indicator_function_values(fe_values.get_quadrature().get_points(), indicator_function_values, solution_cell,
                                                                    rectangle);
 
-        std::cout<<"number of quadrature points: "<<n_q_points<<std::endl;
-
         //if (cell_is_in_fictitious_domain(solution_cell) == false)
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
 
@@ -410,16 +408,11 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system ()
 
                     cell_matrix(i,j) += (fe_values.shape_grad(i,q_index) * //
                                          fe_values.shape_grad(j,q_index)  * indicator_function_values[q_index] *
-                                         fe_values.JxW(q_index)); // *
-                    //std::cout<<coefficient_values[q_index]<<std::endl;
-                    //if (cell_is_cut_by_boundary(solution_cell))
-                    //cell_matrix(i,j) += beta * fe_values.shape_value(i,q_index) * fe_values.shape_value(j,q_index);
+                                         fe_values.JxW(q_index));
                 }
                 cell_rhs(i) += (fe_values.shape_value(i,q_index) * indicator_function_values[q_index] * // the cell rhs
                                 1.0 *
                                 fe_values.JxW(q_index));
-                //if (cell_is_cut_by_boundary(solution_cell))
-                //cell_rhs(i) += beta * fe_values.shape_value(i,q_index) * 0.0; // Dirichlet boundary condition zero
             }
 
         }
