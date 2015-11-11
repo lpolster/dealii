@@ -69,6 +69,8 @@ private:
                                        const Quadrature<dim>* quadrature_formula);
     Quadrature<dim> collect_quadrature_on_boundary(typename DoFHandler<dim>::cell_iterator solution_cell);
     std::vector<std::vector<double>> collect_normal_vector_on_boundary(typename DoFHandler<dim>::cell_iterator solution_cell);
+    Quadrature<dim> map_quadrature_points_and_weights_to_reference_cell (std::vector<Point<dim>> q_points, // quadrature points
+                                    std::vector<double> q_weights, std::vector<unsigned int> refinement_level_vec, typename DoFHandler<dim>::cell_iterator cell, std::string filename);
 
 
 
@@ -234,8 +236,8 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature_on_bou
     std::vector<unsigned int> refinement_level_vec_boundary;
     unsigned int refinement_level;
 
-    std::ofstream ofs_boundary_quadrature_points;
-    ofs_boundary_quadrature_points.open ("boundary_quadrature_points", std::ofstream::out | std::ofstream::app);
+//    std::ofstream ofs_boundary_quadrature_points;
+//    ofs_boundary_quadrature_points.open ("boundary_quadrature_points", std::ofstream::out | std::ofstream::app);
 
     typename DoFHandler<dim>::active_cell_iterator
                 cell = dof_handler_adaptiveIntegration.begin_active(),
@@ -267,21 +269,8 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature_on_bou
             }
         }
 
-    for (unsigned int i = 0; i<boundary_q_points_list.size(); ++i)
-    {
-        ofs_boundary_quadrature_points<<boundary_q_points_list[i][0]<<" "<< boundary_q_points_list[i][1]<<std::endl;
-        boundary_q_points_list[i][0] = (boundary_q_points_list[i][0] - solution_cell->vertex(0)[0]) / (solution_cell->vertex(1)[0] - solution_cell->vertex(0)[0]);
-        boundary_q_points_list[i][1] = (boundary_q_points_list[i][1] - solution_cell->vertex(0)[1]) / (solution_cell->vertex(2)[1] - solution_cell->vertex(0)[1]);
-        boundary_q_weights[i] = boundary_q_weights[i] / pow(4,refinement_level_vec_boundary[i]);
-        std::cout<<boundary_q_points_list[i]<<" "<<boundary_q_weights[i]<<std::endl;
-    }
-
-
-    //std::cout<<std::accumulate(q_weights.begin(), q_weights.end(), 0.0)<<std::endl; // to check if sum of all weights is 1
-
-    ofs_boundary_quadrature_points.close();
-
-    return Quadrature<dim>(boundary_q_points_list, boundary_q_weights);
+    return map_quadrature_points_and_weights_to_reference_cell(boundary_q_points_list, boundary_q_weights,
+                                                               refinement_level_vec_boundary, solution_cell, "collected_quadrature_on_boundary");
 }
 
 template <int dim>
@@ -298,9 +287,6 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
 
     // fe values of the solutions grid
     FEValues<dim> fe_values_solution_cell_temp (fe, *quadrature_formula, update_quadrature_points);
-
-    std::ofstream ofs_quadrature_points;
-    ofs_quadrature_points.open ("quadrature_points", std::ofstream::out | std::ofstream::app);
 
     if (cell_is_cut_by_boundary(solution_cell)) // if cell on solution grid is cut by boundary
     {
@@ -347,24 +333,32 @@ Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::collect_quadrature(typena
 
     } // endelse
 
-    //    std::cout<<"-----------------------------------"<<std::endl;
-    //    std::cout<<q_points.size()<<" "<<q_weights.size()<<std::endl;
+    return  map_quadrature_points_and_weights_to_reference_cell(q_points, q_weights, refinement_level_vec, solution_cell, "collected_quadrature");
+}
+
+template <int dim>
+Quadrature<dim> adaptiveNumberOfQuadraturePoints<dim>::map_quadrature_points_and_weights_to_reference_cell (std::vector<Point<dim>> q_points, // quadrature points
+                                std::vector<double> q_weights, std::vector<unsigned int> refinement_level_vec, typename DoFHandler<dim>::cell_iterator cell, std::string filename)
+{
+
+    std::ofstream ofs_quadrature_points;
+
+    ofs_quadrature_points.open (filename, std::ofstream::out | std::ofstream::app);
 
     for (unsigned int i = 0; i<q_points.size(); ++i) // loop over all quadrature points
     {
-        q_weights[i] = q_weights[i]/pow(4,refinement_level_vec[i]); // caluclate weight of quadrature point such that the weights add up to 1
-        ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<" "<<q_weights[i]<<std::endl;
+    q_weights[i] = q_weights[i]/pow(4,refinement_level_vec[i]); // caluclate weight of quadrature point such that the weights add up to 1
 
-        q_points[i][0] = (q_points[i][0] - solution_cell->vertex(0)[0]) / (solution_cell->vertex(1)[0] - solution_cell->vertex(0)[0]); // calculate x location of quadrature point on reference cell
-        q_points[i][1] = (q_points[i][1] - solution_cell->vertex(0)[1]) / (solution_cell->vertex(2)[1] - solution_cell->vertex(0)[1]); // calculate y location of quadrature point on reference cell
-        //std::cout<<q_points[i]<<" "<<q_weights[i]<<std::endl;
-    } //endfor
+    ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
+    std::cout<<" "<<q_weights[i]<<std::endl;
 
-    //std::cout<<std::accumulate(q_weights.begin(), q_weights.end(), 0.0)<<std::endl; // to check if sum of all weights is 1
+    q_points[i][0] = (q_points[i][0] - cell->vertex(0)[0]) / (cell->vertex(1)[0] - cell->vertex(0)[0]); // calculate x location of quadrature point on reference cell
+    q_points[i][1] = (q_points[i][1] - cell->vertex(0)[1]) / (cell->vertex(2)[1] - cell->vertex(0)[1]); // calculate y location of quadrature point on reference cell
+    }
 
     ofs_quadrature_points.close();
 
-    return Quadrature<dim>(q_points, q_weights); // return the quadrature formula containing the quadrature points and weights
+    return Quadrature<dim>(q_points, q_weights);
 }
 
 template <int dim>
@@ -409,7 +403,7 @@ void adaptiveNumberOfQuadraturePoints<dim>::assemble_system ()
         //if (cell_is_in_fictitious_domain(solution_cell) == false)
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
 
-            std::cout<<indicator_function_values[q_index]<<std::endl;
+            //std::cout<<indicator_function_values[q_index]<<std::endl;
 
             for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
                 for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
