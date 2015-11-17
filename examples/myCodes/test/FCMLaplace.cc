@@ -1,4 +1,5 @@
 #include "FCMLaplace.h"
+#include "find_cells.h"
 
 using namespace dealii;
 
@@ -57,7 +58,11 @@ void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &poi
                                                                           std::vector<double> &indicator_function_values,
                                                                           typename DoFHandler<2>::cell_iterator solution_cell,
                                                                           boundary_function f)
-{   double x, y;
+{
+    std::ofstream ofs_indicator_function_values;
+    ofs_indicator_function_values.open ("indicator_function_values", std::ofstream::out | std::ofstream::app);
+
+    double x, y;
     for (unsigned int i=0; i<indicator_function_values.size(); ++i)
     {
         x = points[i][0] * (solution_cell->vertex(1)[0]-solution_cell->vertex(0)[0]) + solution_cell->vertex(0)[0];
@@ -67,6 +72,8 @@ void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &poi
             indicator_function_values[i] = 1; // indicates physical domain
         else
             indicator_function_values[i] = 1e-8; // indicates fictitous domain
+
+        ofs_indicator_function_values << x << " " << y << " " << indicator_function_values[i] << std::endl;
     }
 
 }
@@ -167,6 +174,79 @@ Quadrature<2> FCMLaplace::collect_quadrature_on_boundary(typename DoFHandler<2>:
     return map_quadrature_points_and_weights_to_reference_cell(boundary_q_points_list, boundary_q_weights,
                                                                refinement_level_vec_boundary, solution_cell, "collected_quadrature_on_boundary");
 }
+
+//____________________________________________
+
+Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulation<2>::cell_iterator cell,
+                                            const dealii::Quadrature<2>* base_quadrature)
+{
+    if(cell->active())
+    {
+        // not refined, return copy of base quadrature
+        return *base_quadrature;
+    }
+    // get collected quadratures of each children and merge them
+    std::vector<dealii::Point<2> > q_points;
+    std::vector<double> q_weights;
+    for(unsigned int child = 0;
+        child < dealii::GeometryInfo<2>::max_children_per_cell;
+        ++child)
+    {
+        // get child
+        typename dealii::Triangulation<2>::cell_iterator child_cell =
+        cell->child(child);
+        // collect sub-quadratures there
+        dealii::Quadrature<2> childs_collected_quadratures =
+        collect_quadratures_pesser(child_cell, base_quadrature);
+        // project to current cell
+        dealii::Quadrature<2> child_quadrature =
+        dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+        // collect resulting quadrature
+        q_points.insert(q_points.end(),
+                        child_quadrature.get_points().begin(),
+                        child_quadrature.get_points().end());
+        q_weights.insert(q_weights.end(),
+                         child_quadrature.get_weights().begin(),
+                         child_quadrature.get_weights().end());
+    }
+    
+//    std::ofstream ofs_collected_quadrature;
+//    ofs_collected_quadrature.open ("collected_quadrature", std::ofstream::out | std::ofstream::app);
+//
+//    for (unsigned int i = 0; i < q_points.size(); ++i)
+//    {
+//        ofs_collected_quadrature<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
+//
+//    }
+//    ofs_collected_quadrature.close();
+    
+    return dealii::Quadrature<2>(q_points, q_weights);
+}
+//______________________________________
+
+ std::vector<dealii::Point<2> > FCMLaplace::map_to_global_coordinates (std::vector<Point<2>> q_points,
+                                                                       DoFHandler<2>::cell_iterator cell, std::string filename)
+{
+    
+    std::ofstream ofs_quadrature_points;
+    
+    ofs_quadrature_points.open (filename, std::ofstream::out | std::ofstream::app);
+    
+    for (unsigned int i = 0; i<q_points.size(); ++i) // loop over all quadrature points
+    {
+        q_points[i][0] = (q_points[i][0] * (cell->vertex(1)[0] - cell->vertex(0)[0])) + cell->vertex(0)[0]; // calculate x location of quadrature point on reference cell
+        q_points[i][1] = (q_points[i][1] * (cell->vertex(2)[1] - cell->vertex(0)[1])) + cell->vertex(0)[1]; // calculate y location of quadrature point on reference cell
+        
+        ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
+        //    std::cout<<" "<<q_weights[i]<<std::endl;
+    }
+    
+    ofs_quadrature_points.close();
+    
+    return q_points;
+}
+
+//___________________________________________
 
 
 Quadrature<2> FCMLaplace::collect_quadrature(typename DoFHandler<2>::cell_iterator solution_cell, const Quadrature<2>* quadrature_formula)
@@ -281,7 +361,11 @@ void FCMLaplace::assemble_system ()
 
 //        std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
 
-        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
+        collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
+        
+        std::cout<<"Solution cell number "<<solution_cell<< " has " << collected_quadrature.size()<< " quadrature points." <<std::endl;
+
+//        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
         FEValues<2> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
         fe_values.reinit(solution_cell);                        // reinitialize fe values on current cells
@@ -289,6 +373,7 @@ void FCMLaplace::assemble_system ()
         unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
 
         std::vector<double> indicator_function_values(n_q_points);
+
         get_indicator_function_values(fe_values.get_quadrature().get_points(), indicator_function_values, solution_cell,
                                                                    m_boundaryFunction);
 

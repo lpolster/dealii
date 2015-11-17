@@ -37,6 +37,7 @@ using namespace dealii;
 class FCMLaplace
 {
     typedef bool (FCMLaplace::*boundary_function)(double, double, const double);
+    
 public:
     FCMLaplace ();
     ~FCMLaplace ();
@@ -67,10 +68,14 @@ private:
     std::vector<Point<2>> get_boundary_quadrature_points(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
     dealii::Tensor<1,2,double> get_normal_vector_at_q_point(std::vector<std::vector<double>> normal_vectors_list, unsigned int q_index);
     void write_solution_to_file (Vector<double> solution);
+    Quadrature<2> collect_quadratures_pesser(typename dealii::Triangulation<2>::cell_iterator cell,
+                                             const dealii::Quadrature<2>* base_quadrature);
     Quadrature<2> collect_quadrature(typename DoFHandler<2>::cell_iterator solution_cell,
                                        const Quadrature<2>* quadrature_formula);
     Quadrature<2> collect_quadrature_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell);
     std::vector<std::vector<double>> collect_normal_vector_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell);
+    std::vector<dealii::Point<2> > map_to_global_coordinates (std::vector<Point<2>> q_points,
+                                                              DoFHandler<2>::cell_iterator cell, std::string filename);
     Quadrature<2> map_quadrature_points_and_weights_to_reference_cell (std::vector<Point<2>> q_points, // quadrature points
                                     std::vector<double> q_weights, std::vector<unsigned int> refinement_level_vec, typename DoFHandler<2>::cell_iterator cell, std::string filename);
     void output_grid(const Triangulation<2>& tria, std::string name, const unsigned int nr);
