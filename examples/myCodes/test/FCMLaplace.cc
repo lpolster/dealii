@@ -210,22 +210,12 @@ Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulat
                          child_quadrature.get_weights().end());
     }
     
-//    std::ofstream ofs_collected_quadrature;
-//    ofs_collected_quadrature.open ("collected_quadrature", std::ofstream::out | std::ofstream::app);
-//
-//    for (unsigned int i = 0; i < q_points.size(); ++i)
-//    {
-//        ofs_collected_quadrature<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
-//
-//    }
-//    ofs_collected_quadrature.close();
-    
     return dealii::Quadrature<2>(q_points, q_weights);
 }
 //______________________________________
 
- std::vector<dealii::Point<2> > FCMLaplace::map_to_global_coordinates (std::vector<Point<2>> q_points,
-                                                                       DoFHandler<2>::cell_iterator cell, std::string filename)
+void FCMLaplace::plot_in_global_coordinates (std::vector<Point<2>> q_points,
+                                             DoFHandler<2>::cell_iterator cell, std::string filename)
 {
     
     std::ofstream ofs_quadrature_points;
@@ -243,7 +233,6 @@ Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulat
     
     ofs_quadrature_points.close();
     
-    return q_points;
 }
 
 //___________________________________________
@@ -359,16 +348,19 @@ void FCMLaplace::assemble_system ()
         cell_matrix = 0;
         cell_rhs = 0;
 
-//        std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
+//       std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
 
-        collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
-        
+//       collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
+
+        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
         std::cout<<"Solution cell number "<<solution_cell<< " has " << collected_quadrature.size()<< " quadrature points." <<std::endl;
 
-//        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
         FEValues<2> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
         fe_values.reinit(solution_cell);                        // reinitialize fe values on current cells
+
+
+//        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), solution_cell, "collected_quadrature_pesser");
 
         unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
 
@@ -447,7 +439,6 @@ void FCMLaplace::assemble_system ()
                                                 system_matrix,
                                                 system_rhs);
     }
-
 }
 
 
