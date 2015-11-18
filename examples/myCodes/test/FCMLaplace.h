@@ -52,6 +52,7 @@ private:
     cell_is_in_fictitious_domain (const typename DoFHandler<2>::cell_iterator &cell);
     static bool
     cell_is_cut_by_boundary (const typename DoFHandler<2>::cell_iterator &cell);
+    static bool cut_by_boundary (typename dealii::Triangulation<2>::cell_iterator &cell);
     static bool
     cell_is_child (const typename DoFHandler<2>::cell_iterator &cell, const typename DoFHandler<2>::cell_iterator &solution_cell);
 
@@ -65,11 +66,13 @@ private:
                                                                               boundary_function f);
     void set_material_ids(DoFHandler<2> &dof_handler, boundary_function f);
     std::vector<double> get_normal_vector(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
-    std::vector<Point<2>> get_boundary_quadrature_points(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
+ //   std::vector<Point<2>> get_boundary_quadrature_points(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
+    std::vector<Point<2>> get_boundary_quadrature_points(typename dealii::Triangulation<2>::cell_iterator cell, boundary_function f);
     dealii::Tensor<1,2,double> get_normal_vector_at_q_point(std::vector<std::vector<double>> normal_vectors_list, unsigned int q_index);
     void write_solution_to_file (Vector<double> solution);
     Quadrature<2> collect_quadratures_pesser(typename dealii::Triangulation<2>::cell_iterator cell,
-                                             const dealii::Quadrature<2>* base_quadrature);
+                                            const dealii::Quadrature<2>* base_quadrature);
+    Quadrature<2> collect_quadratures_on_boundary_pesser(typename dealii::Triangulation<2>::cell_iterator cell);
     Quadrature<2> collect_quadrature(typename DoFHandler<2>::cell_iterator solution_cell,
                                        const Quadrature<2>* quadrature_formula);
     Quadrature<2> collect_quadrature_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell);
@@ -103,7 +106,7 @@ private:
     const double triangulation_begin = -1.0;
     const double triangulation_end = 1.0;
     const unsigned int refinement_cycles = 1;
-    const unsigned int global_refinement_level = 5;
+    const unsigned int global_refinement_level = 3;
     const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
     const float dirichlet_boundary_value = 0.000;               // value for Dirichlet boundary condition
     boundary_function m_boundaryFunction = NULL;

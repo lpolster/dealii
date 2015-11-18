@@ -35,6 +35,8 @@ int main ()
     std::remove("indicator_function_values");
     std::remove("collected_quadrature");
     std::remove("collected_quadrature_on_boundary");
+    std::remove("collected_quadrature_on_boundary_pesser");
+    std::remove("collected_quadrature_pesser");
   FCMLaplace laplace_problem2;
   laplace_problem2.run();
 

@@ -30,6 +30,10 @@ bool FCMLaplace::cell_is_in_fictitious_domain (const typename DoFHandler<2>::cel
     return (cell->material_id() == fictitious_domain_id);
 }
 
+bool FCMLaplace::cut_by_boundary (typename dealii::Triangulation<2>::cell_iterator &cell)
+{
+    return (cell->material_id() == boundary_domain_id);
+}
 
 bool FCMLaplace::cell_is_cut_by_boundary (const typename DoFHandler<2>::cell_iterator &cell)
 {
@@ -173,6 +177,50 @@ Quadrature<2> FCMLaplace::collect_quadrature_on_boundary(typename DoFHandler<2>:
 
     return map_quadrature_points_and_weights_to_reference_cell(boundary_q_points_list, boundary_q_weights,
                                                                refinement_level_vec_boundary, solution_cell, "collected_quadrature_on_boundary");
+}
+
+//___________________________________________
+
+Quadrature<2> FCMLaplace::collect_quadratures_on_boundary_pesser(typename Triangulation<2>::cell_iterator cell)
+{
+    std::vector<Point<2> > q_points;
+    std::vector<double> q_weights;
+
+    if(cell->active() && cut_by_boundary(cell))
+    {
+        std::vector<Point<2> > q_points_temp;
+        std::vector<double> q_weights_temp (2);
+        // not refined, return copy of base quadrature
+        q_points_temp = get_boundary_quadrature_points(cell,m_boundaryFunction);
+        q_weights_temp = {0.500, 0.500};
+        return dealii::Quadrature<2>(q_points_temp, q_weights_temp);
+    }
+    // get collected quadratures of each children and merge them
+
+    for(unsigned int child = 0;
+        child < dealii::GeometryInfo<2>::max_children_per_cell;
+        ++child)
+    {
+        // get child
+        typename dealii::Triangulation<2>::cell_iterator child_cell =
+        cell->child(child);
+        // collect sub-quadratures there
+        if(child_cell->active() && cut_by_boundary(child_cell)){
+        dealii::Quadrature<2> childs_collected_quadratures =
+        collect_quadratures_on_boundary_pesser(child_cell);
+        // project to current cell
+        dealii::Quadrature<2> child_quadrature =
+        dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+        // collect resulting quadrature
+        q_points.insert(q_points.end(),
+                        child_quadrature.get_points().begin(),
+                        child_quadrature.get_points().end());
+        q_weights.insert(q_weights.end(),
+                         child_quadrature.get_weights().begin(),
+                         child_quadrature.get_weights().end());}
+    }
+
+    return dealii::Quadrature<2>(q_points, q_weights);
 }
 
 //____________________________________________
@@ -342,6 +390,7 @@ void FCMLaplace::assemble_system ()
     typename DoFHandler<2>::active_cell_iterator
             solution_cell = dof_handler.begin_active(),         // iterator to first active cell of the solution grid
             solution_endc = dof_handler.end();                  // iterator to the one past last active cell of the solution grid
+    typename Triangulation<2>::active_cell_iterator tria_cell = triangulation.begin_active();
 
     for (; solution_cell!=solution_endc; ++solution_cell) // loop over all cells on solution grid
     {
@@ -350,17 +399,16 @@ void FCMLaplace::assemble_system ()
 
 //       std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
 
-//       collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
+       collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
 
-        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
-        std::cout<<"Solution cell number "<<solution_cell<< " has " << collected_quadrature.size()<< " quadrature points." <<std::endl;
+//        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
+//        std::cout<<"Solution cell number "<<solution_cell<< " has " << collected_quadrature.size()<< " quadrature points." <<std::endl;
 
         FEValues<2> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
         fe_values.reinit(solution_cell);                        // reinitialize fe values on current cells
 
-
-//        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), solution_cell, "collected_quadrature_pesser");
+        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), solution_cell, "collected_quadrature_pesser");
 
         unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
 
@@ -385,17 +433,24 @@ void FCMLaplace::assemble_system ()
                                 1.0 *
                                 fe_values.JxW(q_index));
             }
-
         }
 
 
 
         if (cell_is_cut_by_boundary(solution_cell))
         {
+            std::cout<<"Cell "<<solution_cell<<" is cut by boundary."<<std::endl;
+//            std::cout<<topological_equivalent(solution_cell, triangulation_adaptiveIntegration)->child(0)<<std::endl;
+//            std::cout<<tria_cell->child(0)<<std::endl;
             normal_vectors_list = collect_normal_vector_on_boundary(solution_cell);
-            collected_quadrature_on_boundary = collect_quadrature_on_boundary(solution_cell);
+//            collected_quadrature_on_boundary = collect_quadrature_on_boundary(solution_cell);
+            collected_quadrature_on_boundary = collect_quadratures_on_boundary_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration));
+
             FEValues<2> fe_values_on_boundary(fe, collected_quadrature_on_boundary, update_quadrature_points |  update_gradients | update_JxW_values | update_jacobians  |  update_values);
             fe_values_on_boundary.reinit(solution_cell);
+
+            plot_in_global_coordinates(fe_values_on_boundary.get_quadrature().get_points(), solution_cell, "collected_quadrature_on_boundary_pesser");
+
             unsigned int   n_q_points_boundary    = collected_quadrature_on_boundary.size();
             dealii::Tensor<1,2,double> normal_vector;
 //            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
@@ -430,6 +485,8 @@ void FCMLaplace::assemble_system ()
 
                 }
         } // endif
+
+        std::cout<<solution_cell<<" "<<tria_cell<<std::endl; tria_cell ++;
 
         solution_cell-> get_dof_indices (local_dof_indices);  // return the global indices of the dof located on this object
 
@@ -537,8 +594,7 @@ void FCMLaplace::set_material_ids(DoFHandler<2> &dof_handler, boundary_function 
     }
 }
 
-
-std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename DoFHandler<2>::cell_iterator cell, boundary_function f)
+std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename dealii::Triangulation<2>::cell_iterator cell, boundary_function f)
 {
     std::vector<bool> vec0001 = {0, 0, 0, 1};
     std::vector<bool> vec0010 = {0, 0, 1, 0};
