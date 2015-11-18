@@ -10,6 +10,7 @@ FCMLaplace::FCMLaplace ()
       fe (1),
       fe_adaptiveIntegration (1)
 {m_boundaryFunction=&FCMLaplace::rectangle;}
+//____________________________________________________________________________________________________________________________________
 
 
 FCMLaplace::~FCMLaplace ()
@@ -17,51 +18,53 @@ FCMLaplace::~FCMLaplace ()
     dof_handler.clear ();
     dof_handler_adaptiveIntegration.clear();
 }
+//____________________________________________________________________________________________________________________________________
 
 
-bool FCMLaplace::cell_is_in_physical_domain (const typename DoFHandler<2>::cell_iterator &cell)
+bool FCMLaplace::cell_is_in_physical_domain (const typename Triangulation<2>::cell_iterator &cell)
 {
     return (cell->material_id() == physical_domain_id);
 }
+//____________________________________________________________________________________________________________________________________
 
 
-bool FCMLaplace::cell_is_in_fictitious_domain (const typename DoFHandler<2>::cell_iterator &cell)
+bool FCMLaplace::cell_is_in_fictitious_domain (const typename Triangulation<2>::cell_iterator &cell)
 {
     return (cell->material_id() == fictitious_domain_id);
 }
+//____________________________________________________________________________________________________________________________________
 
-bool FCMLaplace::cut_by_boundary (typename dealii::Triangulation<2>::cell_iterator &cell)
+bool FCMLaplace::cell_is_cut_by_boundary (const typename Triangulation<2>::cell_iterator &cell)
 {
     return (cell->material_id() == boundary_domain_id);
 }
+//____________________________________________________________________________________________________________________________________
 
-bool FCMLaplace::cell_is_cut_by_boundary (const typename DoFHandler<2>::cell_iterator &cell)
+
+bool FCMLaplace::cell_is_child (const typename Triangulation<2>::cell_iterator &cell, const typename Triangulation<2>::cell_iterator &solution_cell)
 {
-    return (cell->material_id() == boundary_domain_id);
+    return (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]
+            && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1]);
 }
-
-
-bool FCMLaplace::cell_is_child (const typename DoFHandler<2>::cell_iterator &cell, const typename DoFHandler<2>::cell_iterator &solution_cell)
-{
-   return (cell->vertex(0)[0] >= solution_cell->vertex(0)[0] && cell->vertex(0)[1] >= solution_cell->vertex(0)[1]
-           && cell->vertex(3)[0] <= solution_cell->vertex(3)[0] && cell->vertex(3)[1] <= solution_cell->vertex(3)[1]);
-}
+//____________________________________________________________________________________________________________________________________
 
 bool FCMLaplace::circle (double x, double y, const double radius)
 {
     return ((x*x)+(y*y) <= radius*radius);
 }
+//____________________________________________________________________________________________________________________________________
 
 bool FCMLaplace::rectangle (double x, double y, const double length)
 {
     return (std::abs(x) <= length && std::abs(y) <= length);
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &points,
-                                                                          std::vector<double> &indicator_function_values,
-                                                                          typename DoFHandler<2>::cell_iterator solution_cell,
-                                                                          boundary_function f)
+                                               std::vector<double> &indicator_function_values,
+                                               typename DoFHandler<2>::cell_iterator solution_cell,
+                                               boundary_function f)
 {
     std::ofstream ofs_indicator_function_values;
     ofs_indicator_function_values.open ("indicator_function_values", std::ofstream::out | std::ofstream::app);
@@ -79,9 +82,8 @@ void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &poi
 
         ofs_indicator_function_values << x << " " << y << " " << indicator_function_values[i] << std::endl;
     }
-
 }
-
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::setup_system ()
@@ -95,10 +97,10 @@ void FCMLaplace::setup_system ()
     constraints.clear ();
     DoFTools::make_hanging_node_constraints (dof_handler,
                                              constraints);
-//    VectorTools::interpolate_boundary_values (dof_handler,
-//                                              0,
-//                                              ZeroFunction<2>(),
-//                                              constraints);
+    //    VectorTools::interpolate_boundary_values (dof_handler,
+    //                                              0,
+    //                                              ZeroFunction<2>(),
+    //                                              constraints);
     constraints.close ();
 
     CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
@@ -126,107 +128,62 @@ std::vector<std::vector<double>> FCMLaplace::collect_normal_vector_on_boundary(t
         {
             if (cell_is_cut_by_boundary(cell))
             {
-               normal_vector = get_normal_vector(cell, m_boundaryFunction);
-               normal_vector_list.push_back(normal_vector);
-               normal_vector_list.push_back(normal_vector);
+                normal_vector = get_normal_vector(cell, m_boundaryFunction);
+                normal_vector_list.push_back(normal_vector);
+                normal_vector_list.push_back(normal_vector);
 
             }
         }
     return normal_vector_list;
 }
+//____________________________________________________________________________________________________________________________________
 
 
-
-Quadrature<2> FCMLaplace::collect_quadrature_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell)
-{
-    std::vector<Point<2>> boundary_q_points;
-    std::vector<Point<2>> boundary_q_points_list;
-    std::vector<double> boundary_q_weights;
-    std::vector<unsigned int> refinement_level_vec_boundary;
-    unsigned int refinement_level;
-
-    typename DoFHandler<2>::active_cell_iterator
-                cell = dof_handler_adaptiveIntegration.begin_active(),
-                endc = dof_handler_adaptiveIntegration.end();
-
-    for(; cell!=endc; ++cell)
-
-        if (cell_is_child(cell, solution_cell))
-        {
-            if (cell_is_cut_by_boundary(cell))
-            {
-                boundary_q_points = get_boundary_quadrature_points(cell,m_boundaryFunction);
-
-                // maps only to plot
-                boundary_q_points[0][0] = boundary_q_points[0][0] * (cell->vertex(1)[0]-cell->vertex(0)[0]) + cell->vertex(0)[0];
-                boundary_q_points[0][1] = boundary_q_points[0][1] * (cell->vertex(2)[1]-cell->vertex(0)[1]) + cell->vertex(0)[1];
-                boundary_q_points[1][0] = boundary_q_points[1][0] * (cell->vertex(1)[0]-cell->vertex(0)[0]) + cell->vertex(0)[0];
-                boundary_q_points[1][1] = boundary_q_points[1][1] * (cell->vertex(2)[1]-cell->vertex(0)[1]) + cell->vertex(0)[1];
-
-                boundary_q_points_list.insert(boundary_q_points_list.end(), boundary_q_points.begin(), boundary_q_points.end());;
-
-                refinement_level = cell->level() - solution_cell->level();
-
-                refinement_level_vec_boundary.insert(refinement_level_vec_boundary.end(),refinement_level);
-                refinement_level_vec_boundary.insert(refinement_level_vec_boundary.end(),refinement_level);
-                boundary_q_weights.insert(boundary_q_weights.end(), 0.500);
-                boundary_q_weights.insert(boundary_q_weights.end(), 0.500);
-
-            }
-        }
-
-    return map_quadrature_points_and_weights_to_reference_cell(boundary_q_points_list, boundary_q_weights,
-                                                               refinement_level_vec_boundary, solution_cell, "collected_quadrature_on_boundary");
-}
-
-//___________________________________________
-
-Quadrature<2> FCMLaplace::collect_quadratures_on_boundary_pesser(typename Triangulation<2>::cell_iterator cell)
+Quadrature<2> FCMLaplace::collect_quadratures_on_boundary(typename Triangulation<2>::cell_iterator cell)
 {
     std::vector<Point<2> > q_points;
     std::vector<double> q_weights;
 
-    if(cell->active() && cut_by_boundary(cell))
+    if(cell->active() && cell_is_cut_by_boundary(cell))
     {
         std::vector<Point<2> > q_points_temp;
         std::vector<double> q_weights_temp (2);
-        // not refined, return copy of base quadrature
+        // not refined, return quadrature rule
         q_points_temp = get_boundary_quadrature_points(cell,m_boundaryFunction);
         q_weights_temp = {0.500, 0.500};
         return dealii::Quadrature<2>(q_points_temp, q_weights_temp);
     }
-    // get collected quadratures of each children and merge them
 
+    // get collected quadratures of each children and merge them
     for(unsigned int child = 0;
         child < dealii::GeometryInfo<2>::max_children_per_cell;
         ++child)
     {
         // get child
         typename dealii::Triangulation<2>::cell_iterator child_cell =
-        cell->child(child);
+                cell->child(child);
         // collect sub-quadratures there
-        if(child_cell->active() && cut_by_boundary(child_cell)){
-        dealii::Quadrature<2> childs_collected_quadratures =
-        collect_quadratures_on_boundary_pesser(child_cell);
-        // project to current cell
-        dealii::Quadrature<2> child_quadrature =
-        dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
-        // collect resulting quadrature
-        q_points.insert(q_points.end(),
-                        child_quadrature.get_points().begin(),
-                        child_quadrature.get_points().end());
-        q_weights.insert(q_weights.end(),
-                         child_quadrature.get_weights().begin(),
-                         child_quadrature.get_weights().end());}
+        if(child_cell->active() && cell_is_cut_by_boundary(child_cell)){
+            dealii::Quadrature<2> childs_collected_quadratures =
+                    collect_quadratures_on_boundary(child_cell);
+            // project to current cell
+            dealii::Quadrature<2> child_quadrature =
+                    dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+            // collect resulting quadrature
+            q_points.insert(q_points.end(),
+                            child_quadrature.get_points().begin(),
+                            child_quadrature.get_points().end());
+            q_weights.insert(q_weights.end(),
+                             child_quadrature.get_weights().begin(),
+                             child_quadrature.get_weights().end());}
     }
 
     return dealii::Quadrature<2>(q_points, q_weights);
 }
+//____________________________________________________________________________________________________________________________________
 
-//____________________________________________
-
-Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulation<2>::cell_iterator cell,
-                                            const dealii::Quadrature<2>* base_quadrature)
+Quadrature<2> FCMLaplace::collect_quadratures(typename dealii::Triangulation<2>::cell_iterator cell,
+                                              const dealii::Quadrature<2>* base_quadrature)
 {
     if(cell->active())
     {
@@ -242,13 +199,13 @@ Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulat
     {
         // get child
         typename dealii::Triangulation<2>::cell_iterator child_cell =
-        cell->child(child);
+                cell->child(child);
         // collect sub-quadratures there
         dealii::Quadrature<2> childs_collected_quadratures =
-        collect_quadratures_pesser(child_cell, base_quadrature);
+                collect_quadratures(child_cell, base_quadrature);
         // project to current cell
         dealii::Quadrature<2> child_quadrature =
-        dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+                dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
         // collect resulting quadrature
         q_points.insert(q_points.end(),
                         child_quadrature.get_points().begin(),
@@ -260,7 +217,7 @@ Quadrature<2> FCMLaplace::collect_quadratures_pesser(typename dealii::Triangulat
     
     return dealii::Quadrature<2>(q_points, q_weights);
 }
-//______________________________________
+//____________________________________________________________________________________________________________________________________
 
 void FCMLaplace::plot_in_global_coordinates (std::vector<Point<2>> q_points,
                                              DoFHandler<2>::cell_iterator cell, std::string filename)
@@ -280,99 +237,8 @@ void FCMLaplace::plot_in_global_coordinates (std::vector<Point<2>> q_points,
     }
     
     ofs_quadrature_points.close();
-    
 }
-
-//___________________________________________
-
-
-Quadrature<2> FCMLaplace::collect_quadrature(typename DoFHandler<2>::cell_iterator solution_cell, const Quadrature<2>* quadrature_formula)
-{
-
-    std::vector<Point<2>> q_points; // quadrature points
-    std::vector<double> q_weights; // quadrature weights
-    std::vector<unsigned int> refinement_level_vec; // vector containing the levels of refinement
-    unsigned int refinement_level; // refinement level
-
-
-    // fe values of the adaptive grid
-    FEValues<2> fe_values_temp (fe_adaptiveIntegration, *quadrature_formula, update_quadrature_points);
-
-    // fe values of the solutions grid
-    FEValues<2> fe_values_solution_cell_temp (fe, *quadrature_formula, update_quadrature_points);
-
-    if (cell_is_cut_by_boundary(solution_cell)) // if cell on solution grid is cut by boundary
-    {
-        typename DoFHandler<2>::active_cell_iterator
-                cell = dof_handler_adaptiveIntegration.begin_active(),
-                endc = dof_handler_adaptiveIntegration.end();
-        for(; cell!=endc; ++cell) // loop over all cells of the adaptive grid
-
-            // find cells on adaptive grid that are located at the position on the cell in the solution grid
-            if (cell_is_child(cell, solution_cell))
-            {
-                fe_values_temp.reinit(cell); // reinitialize fe values on cell of adaptive grid
-                q_points.insert(q_points.end(),fe_values_temp.get_quadrature_points().begin(), // add the quadrature points of this cell to the vector of quadrature points
-                                fe_values_temp.get_quadrature_points().end());
-                q_weights.insert(q_weights.end(),fe_values_temp.get_quadrature().get_weights().begin(), // add the quadrature weights of this cell to the vector of quadrature weights
-                                 fe_values_temp.get_quadrature().get_weights().end());
-
-                refinement_level = cell->level() - solution_cell->level(); // calculate the level of refinement of the current cell relative to the solution grid
-
-                for (unsigned int i = 0; i < fe_values_temp.get_quadrature().size(); i++)
-                {
-                    refinement_level_vec.insert(refinement_level_vec.end(),refinement_level); // add the refinement level of the current cell to the vector containing the refinement levels
-                    refinement_level_vec.insert(refinement_level_vec.end(),refinement_level); // add the refinement level of the current cell to the vector containing the refinement levels
-                }
-            }
-
-    } // endif
-
-    else // if cell on solution grid is not cur by the boundary
-    {
-        fe_values_solution_cell_temp.reinit(solution_cell); // reinitialize fe values on the solution cell
-
-        q_points.insert(q_points.end(),fe_values_solution_cell_temp.get_quadrature_points().begin(), // add the quadrature points of this cellto the vector of quadrature points
-                        fe_values_solution_cell_temp.get_quadrature_points().end());
-        q_weights.insert(q_weights.end(),fe_values_solution_cell_temp.get_quadrature().get_weights().begin(), // add the quadrature weights of this cell to the vector of quadrature weights
-                         fe_values_solution_cell_temp.get_quadrature().get_weights().end());
-
-        for (unsigned int i = 0; i < fe_values_solution_cell_temp.get_quadrature().size(); i++)
-        {
-            refinement_level_vec.insert(refinement_level_vec.end(),0);    // add the refinement level of the current cell to the vector containing the refinement levels
-            refinement_level_vec.insert(refinement_level_vec.end(),0);    // add the refinement level of the current cell to the vector containing the refinement levels
-
-        } //endfor
-
-    } // endelse
-
-    return  map_quadrature_points_and_weights_to_reference_cell(q_points, q_weights, refinement_level_vec, solution_cell, "collected_quadrature");
-}
-
-
-Quadrature<2> FCMLaplace::map_quadrature_points_and_weights_to_reference_cell (std::vector<Point<2>> q_points, // quadrature points
-                                std::vector<double> q_weights, std::vector<unsigned int> refinement_level_vec, typename DoFHandler<2>::cell_iterator cell, std::string filename)
-{
-
-    std::ofstream ofs_quadrature_points;
-
-    ofs_quadrature_points.open (filename, std::ofstream::out | std::ofstream::app);
-
-    for (unsigned int i = 0; i<q_points.size(); ++i) // loop over all quadrature points
-    {
-    q_weights[i] = q_weights[i]/pow(4,refinement_level_vec[i]); // caluclate weight of quadrature point such that the weights add up to 1
-
-    ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
-//    std::cout<<" "<<q_weights[i]<<std::endl;
-
-    q_points[i][0] = (q_points[i][0] - cell->vertex(0)[0]) / (cell->vertex(1)[0] - cell->vertex(0)[0]); // calculate x location of quadrature point on reference cell
-    q_points[i][1] = (q_points[i][1] - cell->vertex(0)[1]) / (cell->vertex(2)[1] - cell->vertex(0)[1]); // calculate y location of quadrature point on reference cell
-    }
-
-    ofs_quadrature_points.close();
-
-    return Quadrature<2>(q_points, q_weights);
-}
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::assemble_system ()
@@ -390,32 +256,28 @@ void FCMLaplace::assemble_system ()
     typename DoFHandler<2>::active_cell_iterator
             solution_cell = dof_handler.begin_active(),         // iterator to first active cell of the solution grid
             solution_endc = dof_handler.end();                  // iterator to the one past last active cell of the solution grid
-    typename Triangulation<2>::active_cell_iterator tria_cell = triangulation.begin_active();
 
     for (; solution_cell!=solution_endc; ++solution_cell) // loop over all cells on solution grid
     {
         cell_matrix = 0;
         cell_rhs = 0;
 
-//       std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
+        //       std::cout<<"Calculating contribution of cell "<<solution_cell<<std::endl;
 
-       collected_quadrature = collect_quadratures_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
-
-//        collected_quadrature = collect_quadrature(solution_cell, &quadrature_formula); // get quadrature on current cell
-//        std::cout<<"Solution cell number "<<solution_cell<< " has " << collected_quadrature.size()<< " quadrature points." <<std::endl;
+        collected_quadrature = collect_quadratures(topological_equivalent(solution_cell, triangulation_adaptiveIntegration), &quadrature_formula);
 
         FEValues<2> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
         fe_values.reinit(solution_cell);                        // reinitialize fe values on current cells
 
-        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), solution_cell, "collected_quadrature_pesser");
+        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), solution_cell, "collected_quadrature");
 
         unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
 
         std::vector<double> indicator_function_values(n_q_points);
 
         get_indicator_function_values(fe_values.get_quadrature().get_points(), indicator_function_values, solution_cell,
-                                                                   m_boundaryFunction);
+                                      m_boundaryFunction);
 
         //if (cell_is_in_fictitious_domain(solution_cell) == false)
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
@@ -436,57 +298,51 @@ void FCMLaplace::assemble_system ()
         }
 
 
-
         if (cell_is_cut_by_boundary(solution_cell))
         {
             std::cout<<"Cell "<<solution_cell<<" is cut by boundary."<<std::endl;
-//            std::cout<<topological_equivalent(solution_cell, triangulation_adaptiveIntegration)->child(0)<<std::endl;
-//            std::cout<<tria_cell->child(0)<<std::endl;
             normal_vectors_list = collect_normal_vector_on_boundary(solution_cell);
-//            collected_quadrature_on_boundary = collect_quadrature_on_boundary(solution_cell);
-            collected_quadrature_on_boundary = collect_quadratures_on_boundary_pesser(topological_equivalent(solution_cell, triangulation_adaptiveIntegration));
+            collected_quadrature_on_boundary = collect_quadratures_on_boundary(topological_equivalent(solution_cell, triangulation_adaptiveIntegration));
 
             FEValues<2> fe_values_on_boundary(fe, collected_quadrature_on_boundary, update_quadrature_points |  update_gradients | update_JxW_values | update_jacobians  |  update_values);
             fe_values_on_boundary.reinit(solution_cell);
 
-            plot_in_global_coordinates(fe_values_on_boundary.get_quadrature().get_points(), solution_cell, "collected_quadrature_on_boundary_pesser");
+            plot_in_global_coordinates(fe_values_on_boundary.get_quadrature().get_points(), solution_cell, "collected_quadrature_on_boundary");
 
             unsigned int   n_q_points_boundary    = collected_quadrature_on_boundary.size();
             dealii::Tensor<1,2,double> normal_vector;
-//            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
-//            std::cout<<"Number of quadrature points: "<<n_q_points_boundary<<std::endl;
+            //            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
+            //            std::cout<<"Number of quadrature points: "<<n_q_points_boundary<<std::endl;
 
-//        // Nitsche Method
+       // Nitsche Method
 
-                for (unsigned int q_index=0; q_index<n_q_points_boundary; ++q_index){      // loop over all quadrature points
-                    for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
-                        for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
+            for (unsigned int q_index=0; q_index<n_q_points_boundary; ++q_index){      // loop over all quadrature points
+                for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
+                    for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
 
-                            normal_vector = get_normal_vector_at_q_point(normal_vectors_list, q_index);
+                        normal_vector = get_normal_vector_at_q_point(normal_vectors_list, q_index);
 
-                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(i,q_index) * //
-                                                 fe_values_on_boundary.shape_grad(j,q_index) * normal_vector *
-                                                 fe_values_on_boundary.JxW(q_index));
+                        cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(i,q_index) * //
+                                             fe_values_on_boundary.shape_grad(j,q_index) * normal_vector *
+                                             fe_values_on_boundary.JxW(q_index));
 
-                            cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(j,q_index) * //
-                                                 fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *
-                                                 fe_values_on_boundary.JxW(q_index));
+                        cell_matrix(i,j) -= (fe_values_on_boundary.shape_value(j,q_index) * //
+                                             fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *
+                                             fe_values_on_boundary.JxW(q_index));
 
-                            cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary.shape_value(i,q_index) * //
-                                                 fe_values_on_boundary.shape_value(j,q_index) *
-                                                 fe_values_on_boundary.JxW(q_index));
-                        }
-                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *// the cell rhs
-                                        fe_values_on_boundary.JxW(q_index));
-                        cell_rhs(i) +=  (beta_h * fe_values_on_boundary.shape_value(i,q_index) * //
-                                                 dirichlet_boundary_value *
-                                                 fe_values_on_boundary.JxW(q_index));
-                    } // endfor
+                        cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary.shape_value(i,q_index) * //
+                                                       fe_values_on_boundary.shape_value(j,q_index) *
+                                                       fe_values_on_boundary.JxW(q_index));
+                    }
+                    cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary.shape_grad(i,q_index) * normal_vector *// the cell rhs
+                                    fe_values_on_boundary.JxW(q_index));
+                    cell_rhs(i) +=  (beta_h * fe_values_on_boundary.shape_value(i,q_index) * //
+                                     dirichlet_boundary_value *
+                                     fe_values_on_boundary.JxW(q_index));
+                } // endfor
 
-                }
+            }
         } // endif
-
-        std::cout<<solution_cell<<" "<<tria_cell<<std::endl; tria_cell ++;
 
         solution_cell-> get_dof_indices (local_dof_indices);  // return the global indices of the dof located on this object
 
@@ -497,17 +353,17 @@ void FCMLaplace::assemble_system ()
                                                 system_rhs);
     }
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::solve ()
 {
-//    std::cout<<"Solve....."<<std::endl;
+    //    std::cout<<"Solve....."<<std::endl;
     SparseDirectUMFPACK  A_direct;
     A_direct.initialize(system_matrix);
     A_direct.vmult (solution, system_rhs);
 
-//    std::cout<<"Distribute constraints...."<<std::endl;
-
+    //    std::cout<<"Distribute constraints...."<<std::endl;
     constraints.distribute (solution);
 
     std::ofstream ofs;
@@ -515,6 +371,7 @@ void FCMLaplace::solve ()
     solution.print(ofs, 2, false, true);
     ofs.close();
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::refine_grid ()
@@ -533,17 +390,18 @@ void FCMLaplace::refine_grid ()
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::output_results ()
 {
-    std::string filename_integrationGrid = "integration_grid";
+    std::string filename_integrationGrid = "integration_grid_FCM";
     filename_integrationGrid += ".eps";
     std::ofstream output_integrationGrid (filename_integrationGrid.c_str());
     GridOut grid_out_integrationGrid;
     grid_out_integrationGrid.write_eps (triangulation_adaptiveIntegration, output_integrationGrid);
 
-    std::string filename_solutionGrid = "solution_grid";
+    std::string filename_solutionGrid = "solution_grid_FCM";
     filename_solutionGrid += ".eps";
     std::ofstream output_solutionGrid (filename_solutionGrid.c_str());
     GridOut grid_out_solutionGrid;
@@ -551,15 +409,16 @@ void FCMLaplace::output_results ()
 
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
-    data_out.add_data_vector (solution, "solution");
+    data_out.add_data_vector (solution, "solution_FCM");
     data_out.build_patches ();
 
-    std::ofstream output ("solution.gpl");
+    std::ofstream output ("solution_FCM.gpl");
     data_out.write_gnuplot (output);
 
-    std::ofstream output2 ("solution.vtk");
+    std::ofstream output2 ("solution_FCM.vtk");
     data_out.write_vtk (output2);
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::set_material_ids(DoFHandler<2> &dof_handler, boundary_function f)
@@ -593,6 +452,8 @@ void FCMLaplace::set_material_ids(DoFHandler<2> &dof_handler, boundary_function 
         }
     }
 }
+//____________________________________________________________________________________________________________________________________
+
 
 std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename dealii::Triangulation<2>::cell_iterator cell, boundary_function f)
 {
@@ -611,7 +472,7 @@ std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename dealii
 
     std::vector<Point<2>> q_points_boundary;
 
-   // std::cout<<cell<<std::endl;
+    // std::cout<<cell<<std::endl;
     std::vector<bool> vertex_tracker (4);
     for (unsigned int vertex_iterator = 0; vertex_iterator < 4; vertex_iterator ++){
         if ((this->*f)(cell->vertex(vertex_iterator)[0], cell->vertex(vertex_iterator)[1], threshold)){
@@ -619,7 +480,7 @@ std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename dealii
         }
         else
             vertex_tracker[vertex_iterator] = 0;
-       // std::cout<<vertex_tracker[vertex_iterator]<<" ";
+        // std::cout<<vertex_tracker[vertex_iterator]<<" ";
     }
     //std::cout<<""<<std::endl;
 
@@ -658,18 +519,20 @@ std::vector<Point<2>> FCMLaplace::get_boundary_quadrature_points(typename dealii
 
     return q_points_boundary;
 }
+//____________________________________________________________________________________________________________________________________
 
 
 dealii::Tensor<1,2,double> FCMLaplace::get_normal_vector_at_q_point(std::vector<std::vector<double>> normal_vectors_list, unsigned int q_index)
 {
-     dealii::Tensor<1,2,double>normal_vector;
+    dealii::Tensor<1,2,double>normal_vector;
     normal_vector[0] = normal_vectors_list[q_index][0];
     normal_vector[1] = normal_vectors_list[q_index][1];
     return normal_vector;
 }
+//____________________________________________________________________________________________________________________________________
 
 
-std::vector<double> FCMLaplace::get_normal_vector(typename DoFHandler<2>::cell_iterator cell, boundary_function f)
+std::vector<double> FCMLaplace::get_normal_vector(typename Triangulation<2>::cell_iterator cell, boundary_function f)
 {
     std::vector<bool> vec0001 = {0, 0, 0, 1};
     std::vector<bool> vec0010 = {0, 0, 1, 0};
@@ -692,7 +555,7 @@ std::vector<double> FCMLaplace::get_normal_vector(typename DoFHandler<2>::cell_i
         }
         else
             vertex_tracker[vertex_iterator] = 0;
-       // std::cout<<vertex_tracker[vertex_iterator]<<" ";
+        // std::cout<<vertex_tracker[vertex_iterator]<<" ";
     }
     //std::cout<<""<<std::endl;
 
@@ -722,17 +585,20 @@ std::vector<double> FCMLaplace::get_normal_vector(typename DoFHandler<2>::cell_i
     else
         return {0,0};
 }
+//____________________________________________________________________________________________________________________________________
+
 
 void FCMLaplace::output_grid(const Triangulation<2>& tria,
-                 std::string name,
-                 const unsigned int nr)
+                             std::string name,
+                             const unsigned int nr)
 {
-  GridOut grid_out;
-  std::stringstream filename;
-  filename << name << "-" << nr << ".svg";
-  std::ofstream out(filename.str());
-  grid_out.write_svg(tria, out);
+    GridOut grid_out;
+    std::stringstream filename;
+    filename << name << "-" << nr << ".svg";
+    std::ofstream out(filename.str());
+    grid_out.write_svg(tria, out);
 }
+//____________________________________________________________________________________________________________________________________
 
 
 void FCMLaplace::run ()

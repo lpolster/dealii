@@ -117,9 +117,9 @@ void FEMLaplace::output_results () const
 
   DataOut<2> data_out;
   data_out.attach_dof_handler (dof_handler);
-  data_out.add_data_vector (solution, "solutionFEMLaplace");
+  data_out.add_data_vector (solution, "solution_FEM");
   data_out.build_patches ();
-  std::ofstream output ("solution_FEMLaplace.gpl");
+  std::ofstream output ("solution_FEM.gpl");
   data_out.write_gnuplot (output);
 }
 

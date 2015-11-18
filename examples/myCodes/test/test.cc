@@ -18,8 +18,6 @@
  *          Guido Kanschat, 2011
  */
 #include "find_cells.h"
-#include <fstream>
-#include <iostream>
 #include "FEMLaplace.h"
 #include "FCMLaplace.h"
 
@@ -29,16 +27,13 @@ using namespace dealii;
 
 int main ()
 {
-//  FEMLaplace laplace_problem;
-//  laplace_problem.run ();
-
+    FEMLaplace laplace_problem;
+    laplace_problem.run ();
     std::remove("indicator_function_values");
     std::remove("collected_quadrature");
     std::remove("collected_quadrature_on_boundary");
-    std::remove("collected_quadrature_on_boundary_pesser");
-    std::remove("collected_quadrature_pesser");
-  FCMLaplace laplace_problem2;
-  laplace_problem2.run();
+    FCMLaplace laplace_problem2;
+    laplace_problem2.run();
 
-  return 0;
+    return 0;
 }

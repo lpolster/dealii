@@ -47,14 +47,13 @@ public:
 private:
 
     static bool
-    cell_is_in_physical_domain (const typename DoFHandler<2>::cell_iterator &cell);
+    cell_is_in_physical_domain (const typename Triangulation<2>::cell_iterator &cell);
     static bool
-    cell_is_in_fictitious_domain (const typename DoFHandler<2>::cell_iterator &cell);
+    cell_is_in_fictitious_domain (const typename Triangulation<2>::cell_iterator &cell);
     static bool
-    cell_is_cut_by_boundary (const typename DoFHandler<2>::cell_iterator &cell);
-    static bool cut_by_boundary (typename dealii::Triangulation<2>::cell_iterator &cell);
+    cell_is_cut_by_boundary (const typename Triangulation<2>::cell_iterator &cell);
     static bool
-    cell_is_child (const typename DoFHandler<2>::cell_iterator &cell, const typename DoFHandler<2>::cell_iterator &solution_cell);
+    cell_is_child (const typename Triangulation<2>::cell_iterator &cell, const typename Triangulation<2>::cell_iterator &solution_cell);
 
     void setup_system ();
     void assemble_system ();
@@ -65,17 +64,14 @@ private:
     void get_indicator_function_values(const std::vector<Point<2> > &points, std::vector<double> &indicator_function_values, typename DoFHandler<2>::cell_iterator solution_cell,
                                                                               boundary_function f);
     void set_material_ids(DoFHandler<2> &dof_handler, boundary_function f);
-    std::vector<double> get_normal_vector(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
+    std::vector<double> get_normal_vector(typename Triangulation<2>::cell_iterator cell, boundary_function f);
  //   std::vector<Point<2>> get_boundary_quadrature_points(typename DoFHandler<2>::cell_iterator cell, boundary_function f);
     std::vector<Point<2>> get_boundary_quadrature_points(typename dealii::Triangulation<2>::cell_iterator cell, boundary_function f);
     dealii::Tensor<1,2,double> get_normal_vector_at_q_point(std::vector<std::vector<double>> normal_vectors_list, unsigned int q_index);
     void write_solution_to_file (Vector<double> solution);
-    Quadrature<2> collect_quadratures_pesser(typename dealii::Triangulation<2>::cell_iterator cell,
+    Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cell_iterator cell,
                                             const dealii::Quadrature<2>* base_quadrature);
-    Quadrature<2> collect_quadratures_on_boundary_pesser(typename dealii::Triangulation<2>::cell_iterator cell);
-    Quadrature<2> collect_quadrature(typename DoFHandler<2>::cell_iterator solution_cell,
-                                       const Quadrature<2>* quadrature_formula);
-    Quadrature<2> collect_quadrature_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell);
+    Quadrature<2> collect_quadratures_on_boundary(typename dealii::Triangulation<2>::cell_iterator cell);
     std::vector<std::vector<double>> collect_normal_vector_on_boundary(typename DoFHandler<2>::cell_iterator solution_cell);
     void plot_in_global_coordinates (std::vector<Point<2>> q_points,
                                      DoFHandler<2>::cell_iterator cell, std::string filename);
@@ -102,11 +98,11 @@ private:
     Vector<double>       solution;      // vector for the solution (coefficients of shape functions)
     Vector<double>       system_rhs;    // vector for the right hand side
 
-    const double threshold = 0.500; // threshold
+    const double threshold = 0.990; // threshold
     const double triangulation_begin = -1.0;
     const double triangulation_end = 1.0;
     const unsigned int refinement_cycles = 1;
-    const unsigned int global_refinement_level = 3;
+    const unsigned int global_refinement_level = 5;
     const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
     const float dirichlet_boundary_value = 0.000;               // value for Dirichlet boundary condition
     boundary_function m_boundaryFunction = NULL;
