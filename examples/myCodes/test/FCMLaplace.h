@@ -98,10 +98,10 @@ private:
     Vector<double>       solution;      // vector for the solution (coefficients of shape functions)
     Vector<double>       system_rhs;    // vector for the right hand side
 
-    const double threshold = 0.990; // threshold
+    const double threshold = 0.500; // threshold
     const double triangulation_begin = -1.0;
     const double triangulation_end = 1.0;
-    const unsigned int refinement_cycles = 1;
+    const unsigned int refinement_cycles = 0;
     const unsigned int global_refinement_level = 5;
     const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
     const float dirichlet_boundary_value = 0.000;               // value for Dirichlet boundary condition

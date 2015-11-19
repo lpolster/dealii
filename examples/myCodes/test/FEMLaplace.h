@@ -20,6 +20,7 @@
 #include <deal.II/numerics/data_out.h>
 #include <fstream>
 #include <iostream>
+#include <deal.II/lac/sparse_direct.h>
 
 using namespace dealii;
 

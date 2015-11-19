@@ -60,7 +60,6 @@ bool FCMLaplace::rectangle (double x, double y, const double length)
 }
 //____________________________________________________________________________________________________________________________________
 
-
 void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &points,
                                                std::vector<double> &indicator_function_values,
                                                typename DoFHandler<2>::cell_iterator solution_cell,
@@ -85,7 +84,6 @@ void FCMLaplace::get_indicator_function_values(const std::vector<Point<2> > &poi
 }
 //____________________________________________________________________________________________________________________________________
 
-
 void FCMLaplace::setup_system ()
 {
     dof_handler.distribute_dofs (fe);
@@ -97,10 +95,10 @@ void FCMLaplace::setup_system ()
     constraints.clear ();
     DoFTools::make_hanging_node_constraints (dof_handler,
                                              constraints);
-    //    VectorTools::interpolate_boundary_values (dof_handler,
-    //                                              0,
-    //                                              ZeroFunction<2>(),
-    //                                              constraints);
+//    VectorTools::interpolate_boundary_values (dof_handler,
+//                                              0,
+//                                              ZeroFunction<2>(),
+//                                              constraints);
     constraints.close ();
 
     CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
@@ -137,7 +135,6 @@ std::vector<std::vector<double>> FCMLaplace::collect_normal_vector_on_boundary(t
     return normal_vector_list;
 }
 //____________________________________________________________________________________________________________________________________
-
 
 Quadrature<2> FCMLaplace::collect_quadratures_on_boundary(typename Triangulation<2>::cell_iterator cell)
 {
@@ -233,7 +230,6 @@ void FCMLaplace::plot_in_global_coordinates (std::vector<Point<2>> q_points,
         q_points[i][1] = (q_points[i][1] * (cell->vertex(2)[1] - cell->vertex(0)[1])) + cell->vertex(0)[1]; // calculate y location of quadrature point on reference cell
         
         ofs_quadrature_points<<q_points[i][0]<<" "<< q_points[i][1]<<std::endl;
-        //    std::cout<<" "<<q_weights[i]<<std::endl;
     }
     
     ofs_quadrature_points.close();
@@ -281,9 +277,6 @@ void FCMLaplace::assemble_system ()
 
         //if (cell_is_in_fictitious_domain(solution_cell) == false)
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index){      // loop over all quadrature points
-
-            //std::cout<<indicator_function_values[q_index]<<std::endl;
-
             for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
                 for (unsigned int j=0; j<dofs_per_cell; ++j)  {              // loop over degrees of freedom
 
@@ -311,10 +304,8 @@ void FCMLaplace::assemble_system ()
 
             unsigned int   n_q_points_boundary    = collected_quadrature_on_boundary.size();
             dealii::Tensor<1,2,double> normal_vector;
-            //            std::cout<<"Number of normal vectors: "<<normal_vectors_list.size()<<std::endl;
-            //            std::cout<<"Number of quadrature points: "<<n_q_points_boundary<<std::endl;
 
-       // Nitsche Method
+            // Nitsche Method
 
             for (unsigned int q_index=0; q_index<n_q_points_boundary; ++q_index){      // loop over all quadrature points
                 for (unsigned int i=0; i<dofs_per_cell; ++i)  {                   // loop over degrees of freedom
@@ -410,7 +401,7 @@ void FCMLaplace::output_results ()
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
     data_out.add_data_vector (solution, "solution_FCM");
-    data_out.build_patches ();
+    data_out.build_patches (3); // interpolation for visualization
 
     std::ofstream output ("solution_FCM.gpl");
     data_out.write_gnuplot (output);
@@ -440,15 +431,15 @@ void FCMLaplace::set_material_ids(DoFHandler<2> &dof_handler, boundary_function 
         }
         if (vertex_tracker == vec0000){
             cell->set_material_id (fictitious_domain_id);
-            std::cout<<cell<<" is in fictitious domain."<<std::endl;
+//            std::cout<<cell<<" is in fictitious domain."<<std::endl;
         }
         else if (vertex_tracker == vec1111){
             cell->set_material_id (physical_domain_id);
-            std::cout<<cell<<" is in physical domain."<<std::endl;
+//            std::cout<<cell<<" is in physical domain."<<std::endl;
         }
         else{
             cell->set_material_id(boundary_domain_id);
-            std::cout<<cell<<" contains boundary."<<std::endl;
+//            std::cout<<cell<<" contains boundary."<<std::endl;
         }
     }
 }
@@ -581,9 +572,6 @@ std::vector<double> FCMLaplace::get_normal_vector(typename Triangulation<2>::cel
 
     else if (vertex_tracker == vec0101)
         return {-1, 0};
-
-    else
-        return {0,0};
 }
 //____________________________________________________________________________________________________________________________________
 

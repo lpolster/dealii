@@ -10,8 +10,8 @@ FEMLaplace::FEMLaplace ()
 
 void FEMLaplace::make_grid ()
 {
-  GridGenerator::hyper_cube (triangulation, -1, 1);
-  triangulation.refine_global (5);
+  GridGenerator::hyper_cube (triangulation, -0.5, 0.5);
+  triangulation.refine_global (2);
 
   std::cout << "Number of active cells: "
             << triangulation.n_active_cells()
@@ -104,11 +104,10 @@ void FEMLaplace::assemble_system ()
 
 void FEMLaplace::solve ()
 {
+    SparseDirectUMFPACK  A_direct;
+    A_direct.initialize(system_matrix);
+    A_direct.vmult (solution, system_rhs);
 
-  SolverControl           solver_control (1000, 1e-12);
-  SolverCG<>              solver (solver_control);
-  solver.solve (system_matrix, solution, system_rhs,
-                PreconditionIdentity());
 }
 
 
