@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/step-1.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_cell_finder/CMakeFiles/release.dir

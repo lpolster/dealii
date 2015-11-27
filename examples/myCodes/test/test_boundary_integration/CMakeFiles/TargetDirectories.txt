@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/step-3.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/test_boundary_integration/CMakeFiles/release.dir
