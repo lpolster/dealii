@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/test.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/test/CMakeFiles/release.dir

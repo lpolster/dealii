@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/mypolygon.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/polygon-boundary/poly/CMakeFiles/release.dir
