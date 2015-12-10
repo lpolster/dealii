@@ -42,8 +42,7 @@ public:
             dealii::Point<2> segment_vector = {my_segment.endPoint[0] - my_segment.beginPoint[0],
                                                my_segment.endPoint[1] - my_segment.beginPoint[1]};
             std::cout << "Segment: [" <<my_segment.beginPoint<<"], ["<<my_segment.endPoint<<"]";
-            std::cout << ", normal vector: "<< my_segment.normalVector;
-            std::cout << ", scalar_product: " << scalar_product(segment_vector, my_segment.normalVector) << std::endl;
+            std::cout << ", normal vector: "<< my_segment.normalVector<<std::endl;
         }
     }
     
@@ -83,15 +82,59 @@ public:
         std::remove("plot_q_points");
         std::ofstream ofs_q_points;
         ofs_q_points.open ("plot_q_points", std::ofstream::out | std::ofstream::app);
+
         for (unsigned int i = 0; i <segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
             for (unsigned int j = 0; j <my_segment.q_points .size(); ++j)
                 ofs_q_points <<  my_segment.q_points[j] << std::endl;
         }
+        dealii::Point<2> test_point = {2.0, 0.9};
+        std::cout<<"Test point: "<<test_point<<": "<<is_inside(test_point);
         ofs_q_points.close();
     }
     
+    //    bool is_inside(const dealii::Point<2> p1){
+    //        segment my_segment = segment_list[0];
+    //        double minimum_distance = calculate_distance(my_segment, p1);
+    //        segment closest_segment = my_segment;
+
+    //        for (unsigned int i = 1; i <segment_list.size(); ++i)
+    //        {
+    //            segment my_segment = segment_list[i];
+    //            double distance = calculate_distance(my_segment, p1);
+    //            if(distance < minimum_distance)
+    //                minimum_distance = distance;
+    //        }
+
+    //        if (minimum_distance > 0.0)
+    //            return true;
+    //        else
+    //            return false;
+    //    }
+
+    bool is_inside(const dealii::Point<2> p1){
+        segment my_segment = segment_list[0];
+        double minimum_distance = calculate_distance(my_segment, p1);
+        segment closest_segment = my_segment;
+
+        for (unsigned int i = 1; i <segment_list.size(); ++i)
+        {
+            segment my_segment = segment_list[i];
+            double distance = calculate_distance(my_segment, p1);
+            if(distance < minimum_distance)
+            {
+                minimum_distance = distance;
+                closest_segment = my_segment;
+            }
+        }
+        dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
+
+        if (scalar_product(closest_segment.normalVector, point_vector) > 0)
+            return true;
+        else
+            return false;
+    }
     
 private:
     struct segment{
@@ -102,6 +145,8 @@ private:
         std::vector<dealii::Point<2>> q_points;
         std::vector<double> q_weights = {0.5000, 0.5000};
     };
+    std::vector<segment> segment_list;
+    std::vector<dealii::Point<2>> vertices_list;
     
     std::vector<dealii::Point<2>> calculate_q_points(const segment my_segment)
     {
@@ -122,9 +167,6 @@ private:
         dx = (my_segment.endPoint[0] - my_segment.beginPoint[0]) / my_segment.length;
         dy = (my_segment.endPoint[1] - my_segment.beginPoint[1]) / my_segment.length;
         dealii::Point<2> normalVector = {-dy, dx};
-
-        const dealii::Point<2> p = {1.0, 1.3};
-        std::cout<< "Is inside? "<< is_inside(p)<<std::endl;
         
         return normalVector;
     }
@@ -137,31 +179,7 @@ private:
         return distance;
     }
 
-    bool is_inside(const dealii::Point<2> p1){
-        segment my_segment = segment_list[0];
-        double minimum_distance = calculate_distance(my_segment, p1);
-        segment closest_segment = my_segment;
 
-        for (unsigned int i = 1; i <segment_list.size(); ++i)
-        {
-            segment my_segment = segment_list[i];
-            double distance = calculate_distance(my_segment, p1);
-            if(distance < minimum_distance)
-            {
-                minimum_distance = distance;
-                closest_segment = my_segment;
-            }
-        }
-
-        if (minimum_distance > 0.0)
-            return true;
-        else
-            return false;
-    }
-
-
-    std::vector<segment> segment_list;
-    std::vector<dealii::Point<2>> vertices_list;
 };
 
 int main()
