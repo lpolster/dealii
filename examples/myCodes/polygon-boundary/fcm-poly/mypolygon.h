@@ -32,9 +32,9 @@ public:
             my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint));
             my_segment.q_points = calculate_q_points(my_segment);
             my_segment.normalVector = calculate_normals(my_segment);
-
+            
             segment_list.push_back(my_segment);
-
+            
             std::cout << "Segment: [" <<my_segment.beginPoint<<"], ["<<my_segment.endPoint<<"]";
             std::cout << ", normal vector: "<< my_segment.normalVector<<std::endl;
         }
@@ -48,7 +48,7 @@ public:
                 product = product + (a[i])*(b[i]);
         return product;
     }
-
+    
     void list_segments(){
         std::cout<<"Listing segments: "<<std::endl;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
@@ -71,12 +71,12 @@ public:
         ofs_poly<<end_segment.endPoint<<std::endl;
         ofs_poly.close();
     }
-
+    
     bool is_inside(const dealii::Point<2> p1){
         segment my_segment = segment_list[0];
         double minimum_distance = calculate_distance(my_segment, p1);
         segment closest_segment = my_segment;
-
+        
         for (unsigned int i = 1; i <segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
@@ -90,7 +90,7 @@ public:
         std::cout<<"Closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
         std::cout<<"Min Distance: "<<minimum_distance<<std::endl;
         dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
-
+        
         if (scalar_product(closest_segment.normalVector, point_vector) > 0) // if scalar product == 0 -> on boundary
             return true;
         else
@@ -101,15 +101,15 @@ public:
         std::remove("plot_q_points");
         std::ofstream ofs_q_points;
         ofs_q_points.open ("plot_q_points", std::ofstream::out | std::ofstream::app);
-
-        for (unsigned int i = 0; i <segment_list.size(); ++i)
+        
+        for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
             for (unsigned int j = 0; j <my_segment.q_points .size(); ++j)
                 ofs_q_points <<  my_segment.q_points[j] << std::endl;
         }
         std::vector<dealii::Point<2>> test_point_list = {{1.0, 0.5}, {-1.0, -3.1}, {-2.0, 8.0}, {-1.0, 0.9}, {-0.8, -0.9}};
-
+        
         // for testing purposes
         bool inside;
         for (unsigned int i = 0; i<test_point_list.size(); i++)
@@ -117,7 +117,7 @@ public:
             inside = is_inside((test_point_list[i]));
             std::cout<<"Test point: "<<test_point_list[i]<<": "<<inside<<std::endl;
         }
-
+        
         ofs_q_points.close();
     }
     
@@ -130,8 +130,22 @@ public:
                 q_points.insert(q_points.end(), my_segment.q_points[j]);
         }
         return q_points;
-    
     }
+    
+    std::vector<int> get_segment_indices_inside_cell(dealii::DoFHandler<2>::cell_iterator cell)
+    {
+        std::vector<int> segment_indices;
+        for (unsigned int i = 0; i < segment_list.size(); ++i)
+        {
+            segment my_segment = segment_list[i];
+            
+            if (cell->vertex(0)[0] <= std::min(my_segment.beginPoint[0], my_segment.endPoint[0]) && cell->vertex(0)[1] <= std::min(my_segment.beginPoint[1], my_segment.endPoint[1]) && cell->vertex(3)[0] >= std::max(my_segment.beginPoint[0], my_segment.endPoint[0]) && cell->vertex(3)[1] >= std::max(my_segment.beginPoint[1], my_segment.endPoint[1]))
+                
+                segment_indices.insert(segment_indices.end(), i);
+        }
+        return segment_indices;
+    }
+    
     
 private:
     struct segment{
@@ -143,7 +157,7 @@ private:
         std::vector<double> q_weights = {0.5000, 0.5000};
     };
     std::vector<segment> segment_list;
-
+    
     std::vector<dealii::Point<2>> calculate_q_points(const segment my_segment)
     {
         dealii::Point<2> q_point;
@@ -166,12 +180,12 @@ private:
         
         return normalVector;
     }
-
+    
     double calculate_distance(segment my_segment, dealii::Point<2> p){
         double distance = std::abs(my_segment.beginPoint.distance(p)) +  std::abs(my_segment.endPoint.distance(p));
         return distance;
     }
-
+    
 };
 
 

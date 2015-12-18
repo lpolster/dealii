@@ -199,7 +199,12 @@ void Step3::assemble_system ()
                                                 system_rhs);
         
         if (contains_boundary(cell, my_poly))
-        {std::cout<<"Cell nr. "<<cell->index()<<"contains boundary."<<std::endl;}
+        {
+            std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
+            for (unsigned int i = 0; i < segment_indices.size(); ++i)
+                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[i]<<std::endl;
+
+        }
         
         
     }
