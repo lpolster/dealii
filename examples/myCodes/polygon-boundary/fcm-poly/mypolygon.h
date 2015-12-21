@@ -22,6 +22,16 @@
 class myPolygon
 {
 public:
+    struct segment{
+        dealii::Point<2> beginPoint;
+        dealii::Point<2> endPoint;
+        double length;
+        dealii::Point<2> normalVector;
+        std::vector<dealii::Point<2>> q_points;
+        std::vector<double> q_weights = {0.5000, 0.5000};
+    };
+    std::vector<segment> segment_list;
+    
     myPolygon(){ }
     void constructPolygon(const std::vector<dealii::Point<2>> point_list){
         for (unsigned int i = 0; i < point_list.size()-1; ++i)
@@ -148,15 +158,6 @@ public:
     
     
 private:
-    struct segment{
-        dealii::Point<2> beginPoint;
-        dealii::Point<2> endPoint;
-        double length;
-        dealii::Point<2> normalVector;
-        std::vector<dealii::Point<2>> q_points;
-        std::vector<double> q_weights = {0.5000, 0.5000};
-    };
-    std::vector<segment> segment_list;
     
     std::vector<dealii::Point<2>> calculate_q_points(const segment my_segment)
     {

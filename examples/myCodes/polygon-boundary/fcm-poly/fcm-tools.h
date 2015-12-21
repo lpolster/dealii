@@ -1,4 +1,8 @@
-
+const unsigned int global_refinement_level = 3;
+const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
+const float dirichlet_boundary_value = 0.000;
+const unsigned int refinement_cycles = 4;
+//___________________________________________
 dealii::Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cell_iterator cell,
                                           const dealii::Quadrature<2>* base_quadrature)
 {
@@ -34,6 +38,13 @@ dealii::Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cel
     
     return dealii::Quadrature<2>(q_points, q_weights);
 }
+//______________________________________
+dealii::Quadrature<2> collect_quadratures_on_boundary_segment(myPolygon::segment my_segment,
+                                          const dealii::Quadrature<2>* base_quadrature)
+{
+    return dealii::Quadrature<2>(my_segment.q_points, my_segment.q_weights);
+}
+
 //______________________________________
 void plot_in_global_coordinates (std::vector<dealii::Point<2>> q_points,
                                  dealii::DoFHandler<2>::cell_iterator cell, std::string filename)

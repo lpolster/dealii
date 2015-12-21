@@ -46,6 +46,7 @@ private:
     void assemble_system ();
     void solve ();
     void output_results () const;
+    void refine_grid();
     
     Triangulation<2>     triangulation;
     FE_Q<2>              fe;
@@ -78,10 +79,10 @@ dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 void Step3::make_grid ()
 {
     GridGenerator::hyper_cube (triangulation, -2, 2);
-    triangulation.refine_global (1);
+    triangulation.refine_global (global_refinement_level);
     
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2);
-    triangulation_adaptiveIntegration.refine_global (2);
+    triangulation_adaptiveIntegration.refine_global (global_refinement_level); // adaptive refinement muss noch implementiert werden
     
     std::cout << "Number of active cells: "
     << triangulation.n_active_cells()
@@ -102,18 +103,16 @@ void Step3::setup_system ()
 {
     dof_handler.distribute_dofs (fe);
     dof_handler_adaptiveIntegration.distribute_dofs(fe_adaptiveIntegration);
-    std::cout << "Number of degrees of freedom: "
-    << dof_handler.n_dofs()
-    << std::endl;
+    std::cout << "Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl;
     
     constraints.clear ();
     DoFTools::make_hanging_node_constraints (dof_handler,
                                              constraints);
     // Toggle comment for fcm
-    VectorTools::interpolate_boundary_values (dof_handler,
-                                              0,
-                                              ZeroFunction<2>(),
-                                              constraints);
+    //    VectorTools::interpolate_boundary_values (dof_handler,
+    //                                              0,
+    //                                              ZeroFunction<2>(),
+    //                                              constraints);
     constraints.close ();
     
     
@@ -134,22 +133,20 @@ void Step3::assemble_system ()
 {
     QGauss<2>  quadrature_formula(2);
     Quadrature<2> collected_quadrature;                       // the quadrature rule
-    Quadrature<2> collected_quadrature_on_boundary;           // quadrature rule on boundary
+    Quadrature<2> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
     std::vector<std::vector<double>> normal_vectors_list;
     FEValues<2> fe_values (fe, quadrature_formula,
                            update_values | update_gradients | update_JxW_values);
     
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
-    const unsigned int   n_q_points    = quadrature_formula.size();
     
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
     Vector<double>       cell_rhs (dofs_per_cell);
     
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
     
-    DoFHandler<2>::active_cell_iterator
-    cell = dof_handler.begin_active(),
-    endc = dof_handler.end();
+    DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    
     for (; cell!=endc; ++cell)
     {
         fe_values.reinit (cell);
@@ -166,25 +163,23 @@ void Step3::assemble_system ()
         
         plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
         
-        unsigned int n_q_points = collected_quadrature.size(); // number of quadrature points
-        
-        std::vector<double> indicator_function_values(n_q_points);
+        std::vector<double> indicator_function_values( collected_quadrature.size());
         
         indicator_function_values = get_indicator_function_values(fe_values.get_quadrature().get_points(), cell, my_poly);
         
-        for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+        for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index)
         {
             
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 for (unsigned int j=0; j<dofs_per_cell; ++j)
                     cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *
                                          fe_values.shape_grad (j, q_index) *
-                                         indicator_function_values[q_index] *
+                                         //indicator_function_values[q_index] *
                                          fe_values.JxW (q_index));
             
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 cell_rhs(i) += (fe_values.shape_value (i, q_index) *
-                                indicator_function_values[q_index] *
+                                //indicator_function_values[q_index] *
                                 1 *
                                 fe_values.JxW (q_index));
         }
@@ -201,11 +196,46 @@ void Step3::assemble_system ()
         if (contains_boundary(cell, my_poly))
         {
             std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
-            for (unsigned int i = 0; i < segment_indices.size(); ++i)
-                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[i]<<std::endl;
-
-        }
-        
+            for (unsigned int k = 0; k < segment_indices.size(); ++ k){
+                
+                // continue working here...
+                
+                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_poly.segment_list[segment_indices[k]], &quadrature_formula);
+                
+                FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values);
+                
+                fe_values_on_boundary_segment.reinit(cell);
+                
+                myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
+                
+                
+                for (unsigned int q_index=0; q_index<collected_quadrature_on_boundary_segment.size(); ++q_index)
+                {
+                    for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
+                        for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
+                            
+                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) * //
+                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length);
+                            
+                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                 fe_values_on_boundary_segment.shape_grad(i,q_index) *
+                                                 my_segment.normalVector *
+                                                 my_segment.length);
+                            
+                            cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary_segment.shape_value(i,q_index) *
+                                                           fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                           my_segment.length);
+                        } // endfor
+                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) * my_segment.normalVector * my_segment.length);
+                        cell_rhs(i) +=  (beta_h * fe_values_on_boundary_segment.shape_value(i,q_index) * //
+                                         dirichlet_boundary_value * my_segment.length);
+                    } // endfor
+                    
+                } // endfor
+                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
+            }
+            
+        } // endfor
         
     }
     
@@ -243,11 +273,51 @@ void Step3::output_results () const
 }
 
 
+void output_grid(const dealii::Triangulation<2>& tria,
+                 std::string name,
+                 const unsigned int nr)
+{
+    GridOut grid_out;
+    std::stringstream filename;
+    filename << name << "-" << nr << ".svg";
+    std::ofstream out(filename.str());
+    grid_out.write_svg(tria, out);
+}
+
+void Step3::refine_grid ()
+{
+    // Create a vector of floats that contains information about whether the cell contains the boundary or not
+    
+    typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
+    cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
+    endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
+    
+    for (; cell!=endc; ++cell) // loop over all active cells
+    {
+        if (contains_boundary(cell, my_poly))
+        {
+            cell -> set_refine_flag();
+        }
+    }
+    
+    triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
+}
+
+
 void Step3::run ()
 {
     make_grid ();
-    setup_system ();
     setup_boundary ();
+    
+    for (unsigned int i = 0; i < refinement_cycles; i++)
+    {
+        refine_grid ();
+        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i);
+        
+    }
+    
+    setup_system ();
+    
     assemble_system ();
     solve ();
     output_results ();
