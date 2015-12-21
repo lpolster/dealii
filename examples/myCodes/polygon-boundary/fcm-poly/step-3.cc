@@ -174,35 +174,28 @@ void Step3::assemble_system ()
                 for (unsigned int j=0; j<dofs_per_cell; ++j)
                     cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *
                                          fe_values.shape_grad (j, q_index) *
-                                         //indicator_function_values[q_index] *
+                                         indicator_function_values[q_index] *
                                          fe_values.JxW (q_index));
             
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 cell_rhs(i) += (fe_values.shape_value (i, q_index) *
-                                //indicator_function_values[q_index] *
+                                indicator_function_values[q_index] *
                                 1 *
                                 fe_values.JxW (q_index));
         }
         
-        cell->get_dof_indices (local_dof_indices);
-        
-        
-        constraints.distribute_local_to_global (cell_matrix,
-                                                cell_rhs,
-                                                local_dof_indices,
-                                                system_matrix,
-                                                system_rhs);
-        
         if (contains_boundary(cell, my_poly))
         {
             std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
+            std::cout<<"No. of segment indices: "<<segment_indices.size()<<std::endl;
+
             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
-                
-                // continue working here...
+
+                // Nitsche method
                 
                 collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_poly.segment_list[segment_indices[k]], &quadrature_formula);
                 
-                FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values);
+                FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
                 
                 fe_values_on_boundary_segment.reinit(cell);
                 
@@ -214,21 +207,29 @@ void Step3::assemble_system ()
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
                             
+                            std::cout<<"Before Nitsche: "<<cell_matrix(i,j)<<std::endl;
+                            
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) * //
-                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length);
+                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length * fe_values_on_boundary_segment.JxW (q_index));
                             
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                  fe_values_on_boundary_segment.shape_grad(i,q_index) *
                                                  my_segment.normalVector *
-                                                 my_segment.length);
+                                                 my_segment.length*
+                                                 fe_values_on_boundary_segment.JxW (q_index));
                             
                             cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                           my_segment.length);
+                                                           my_segment.length *
+                                                           fe_values_on_boundary_segment.JxW (q_index));
+                            
+                            std::cout<<"After Nitsche: "<<cell_matrix(i,j)<<std::endl;
                         } // endfor
-                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) * my_segment.normalVector * my_segment.length);
+                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) * my_segment.normalVector * my_segment.length *
+                                        fe_values_on_boundary_segment.JxW (q_index));
                         cell_rhs(i) +=  (beta_h * fe_values_on_boundary_segment.shape_value(i,q_index) * //
-                                         dirichlet_boundary_value * my_segment.length);
+                                         dirichlet_boundary_value * my_segment.length *
+                                         fe_values_on_boundary_segment.JxW (q_index));
                     } // endfor
                     
                 } // endfor
@@ -237,19 +238,19 @@ void Step3::assemble_system ()
             
         } // endfor
         
+        
+        cell->get_dof_indices (local_dof_indices);
+        
+        
+        constraints.distribute_local_to_global (cell_matrix,
+                                                cell_rhs,
+                                                local_dof_indices,
+                                                system_matrix,
+                                                system_rhs);
     }
     
+
     
-    std::map<types::global_dof_index,double> boundary_values;
-    VectorTools::interpolate_boundary_values (dof_handler,
-                                              0,
-                                              ZeroFunction<2>(),
-                                              boundary_values);
-    
-    MatrixTools::apply_boundary_values (boundary_values,
-                                        system_matrix,
-                                        solution,
-                                        system_rhs);
 }
 
 
@@ -266,7 +267,7 @@ void Step3::output_results () const
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
     data_out.add_data_vector (solution, "solution");
-    data_out.build_patches (5); // linear interpolation for plotting
+    data_out.build_patches (); // linear interpolation for plotting
     
     std::ofstream output ("solution.gpl");
     data_out.write_gnuplot (output);

@@ -1,7 +1,7 @@
-const unsigned int global_refinement_level = 3;
+const unsigned int global_refinement_level = 1;
 const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
 const float dirichlet_boundary_value = 0.000;
-const unsigned int refinement_cycles = 4;
+const unsigned int refinement_cycles = 0;
 //___________________________________________
 dealii::Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cell_iterator cell,
                                           const dealii::Quadrature<2>* base_quadrature)

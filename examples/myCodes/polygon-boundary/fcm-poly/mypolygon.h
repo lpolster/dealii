@@ -118,7 +118,6 @@ public:
             for (unsigned int j = 0; j <my_segment.q_points .size(); ++j)
                 ofs_q_points <<  my_segment.q_points[j] << std::endl;
         }
-        std::vector<dealii::Point<2>> test_point_list = {{1.0, 0.5}, {-1.0, -3.1}, {-2.0, 8.0}, {-1.0, 0.9}, {-0.8, -0.9}};
         
         ofs_q_points.close();
     }
