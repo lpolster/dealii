@@ -49,7 +49,6 @@ dealii::Quadrature<2> collect_quadratures_on_boundary_segment(myPolygon::segment
 void plot_in_global_coordinates (std::vector<dealii::Point<2>> q_points,
                                  dealii::DoFHandler<2>::cell_iterator cell, std::string filename)
 {
-    
     std::ofstream ofs_quadrature_points;
     
     ofs_quadrature_points.open (filename, std::ofstream::out | std::ofstream::app);

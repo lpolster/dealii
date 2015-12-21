@@ -97,8 +97,8 @@ public:
                 closest_segment = my_segment;
             }
         }
-        std::cout<<"Closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
-        std::cout<<"Min Distance: "<<minimum_distance<<std::endl;
+//        std::cout<<"Closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
+//        std::cout<<"Min Distance: "<<minimum_distance<<std::endl;
         dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
         
         if (scalar_product(closest_segment.normalVector, point_vector) > 0) // if scalar product == 0 -> on boundary
@@ -108,9 +108,9 @@ public:
     }
     
     void save_q_points(){
-        std::remove("plot_q_points");
+        std::remove("plot_q_points_on_boundary");
         std::ofstream ofs_q_points;
-        ofs_q_points.open ("plot_q_points", std::ofstream::out | std::ofstream::app);
+        ofs_q_points.open ("plot_q_points_on_boundary", std::ofstream::out | std::ofstream::app);
         
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
@@ -119,14 +119,6 @@ public:
                 ofs_q_points <<  my_segment.q_points[j] << std::endl;
         }
         std::vector<dealii::Point<2>> test_point_list = {{1.0, 0.5}, {-1.0, -3.1}, {-2.0, 8.0}, {-1.0, 0.9}, {-0.8, -0.9}};
-        
-        // for testing purposes
-        bool inside;
-        for (unsigned int i = 0; i<test_point_list.size(); i++)
-        {
-            inside = is_inside((test_point_list[i]));
-            std::cout<<"Test point: "<<test_point_list[i]<<": "<<inside<<std::endl;
-        }
         
         ofs_q_points.close();
     }

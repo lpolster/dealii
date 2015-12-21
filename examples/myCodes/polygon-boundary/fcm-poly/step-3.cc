@@ -266,7 +266,7 @@ void Step3::output_results () const
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
     data_out.add_data_vector (solution, "solution");
-    data_out.build_patches ();
+    data_out.build_patches (5); // linear interpolation for plotting
     
     std::ofstream output ("solution.gpl");
     data_out.write_gnuplot (output);
@@ -317,7 +317,6 @@ void Step3::run ()
     }
     
     setup_system ();
-    
     assemble_system ();
     solve ();
     output_results ();
@@ -326,6 +325,10 @@ void Step3::run ()
 
 int main ()
 {
+    std::remove("indicator_function_values");
+    std::remove("collected_quadrature");
+
+
     Step3 laplace_problem;
     laplace_problem.run ();
     
