@@ -1,6 +1,6 @@
 const unsigned int global_refinement_level = 2;
-const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
-const float dirichlet_boundary_value = 0.000;
+const float beta_h = 20.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
+const float dirichlet_boundary_value = 0.0000;
 const unsigned int refinement_cycles = 2;
 
 //___________________________________________

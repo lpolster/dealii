@@ -81,10 +81,10 @@ dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 
 void Step3::make_grid ()
 {
-    GridGenerator::hyper_cube (triangulation, -2, 2);       // generate triangulation for solution grid
+    GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
     triangulation.refine_global (global_refinement_level);
     
-    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2); // generate triangulation for integration grid
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
     triangulation_adaptiveIntegration.refine_global (global_refinement_level);
     
     std::cout << "Number of active cells: "
@@ -144,9 +144,6 @@ void Step3::assemble_system ()
     QGauss<2>  quadrature_formula(2);
     Quadrature<2> collected_quadrature;                       // the quadrature rule
     Quadrature<2> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
-
-    FEValues<2> fe_values (fe, quadrature_formula,
-                           update_values | update_gradients | update_JxW_values);
     
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
     
@@ -223,34 +220,30 @@ void Step3::assemble_system ()
                 {
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
-                            
-//                            std::cout<<"Before Nitsche: "<<cell_matrix(i,j)<<std::endl;
-                            
-                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) * //
-                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
+                                                        
+                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) *
+                                                 my_segment.normalVector *
+                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
                                                  fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
 
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                 fe_values_on_boundary_segment.shape_grad(i,q_index) *
                                                  my_segment.normalVector *
+                                                 fe_values_on_boundary_segment.shape_grad(i,q_index) *
                                                  my_segment.length*
                                                  fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-                                                 //fe_values_on_boundary_segment.JxW (q_index));
                             
                             cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                            my_segment.length *
                                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-                                                           //fe_values_on_boundary_segment.JxW (q_index));
                             
-//                            std::cout<<"After Nitsche: "<<cell_matrix(i,j)<<std::endl;
                         } // endfor
-                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) * my_segment.normalVector * my_segment.length *
-                                         fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]); //fe_values_on_boundary_segment.JxW (q_index));
-                        cell_rhs(i) +=  (beta_h * fe_values_on_boundary_segment.shape_value(i,q_index) * //
+                        cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) *
+                                        my_segment.normalVector * my_segment.length *
+                                        fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                        cell_rhs(i) +=  (beta_h * fe_values_on_boundary_segment.shape_value(i,q_index) *
                                          dirichlet_boundary_value * my_segment.length *
                                          fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-                                         //fe_values_on_boundary_segment.JxW (q_index));
                     } // endfor
 
                     std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
@@ -272,9 +265,6 @@ void Step3::assemble_system ()
                                                 system_matrix,
                                                 system_rhs);
     }
-    
-
-    
 }
 
 
