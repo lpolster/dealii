@@ -45,8 +45,8 @@ public:
             
             segment_list.push_back(my_segment);
             
-            std::cout << "Segment: [" <<my_segment.beginPoint<<"], ["<<my_segment.endPoint<<"]";
-            std::cout << ", normal vector: "<< my_segment.normalVector<<std::endl;
+            //std::cout << "Segment: [" <<my_segment.beginPoint<<"], ["<<my_segment.endPoint<<"]";
+            //std::cout << ", normal vector: "<< my_segment.normalVector<<std::endl;
         }
     }
     

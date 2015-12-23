@@ -1,7 +1,8 @@
-const unsigned int global_refinement_level = 1;
+const unsigned int global_refinement_level = 2;
 const float beta_h = 2.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
 const float dirichlet_boundary_value = 0.000;
-const unsigned int refinement_cycles = 0;
+const unsigned int refinement_cycles = 2;
+
 //___________________________________________
 dealii::Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cell_iterator cell,
                                           const dealii::Quadrature<2>* base_quadrature)
@@ -39,15 +40,24 @@ dealii::Quadrature<2> collect_quadratures(typename dealii::Triangulation<2>::cel
     return dealii::Quadrature<2>(q_points, q_weights);
 }
 //______________________________________
-dealii::Quadrature<2> collect_quadratures_on_boundary_segment(myPolygon::segment my_segment,
-                                          const dealii::Quadrature<2>* base_quadrature)
+dealii::Quadrature<2> collect_quadratures_on_boundary_segment(const myPolygon::segment my_segment, typename dealii::Triangulation<2>::cell_iterator cell, const dealii::MappingQ1<2> mapping)
 {
-    return dealii::Quadrature<2>(my_segment.q_points, my_segment.q_weights);
+    std::vector<dealii::Point<2> > q_points;
+    dealii::Point<2> q_point_on_real_cell;
+    dealii::Point<2> q_point_on_unit_cell;
+    
+    for (unsigned int i = 0; i < my_segment.q_points.size(); ++i)
+    {
+        q_point_on_real_cell =  my_segment.q_points[i];
+        q_point_on_unit_cell = mapping.transform_real_to_unit_cell (cell,q_point_on_real_cell);
+        q_points.insert(q_points.end(),q_point_on_unit_cell );
+    }
+    return dealii::Quadrature<2>(q_points, my_segment.q_weights);
 }
 
 //______________________________________
 void plot_in_global_coordinates (std::vector<dealii::Point<2>> q_points,
-                                 dealii::DoFHandler<2>::cell_iterator cell, std::string filename)
+                                 const dealii::DoFHandler<2>::cell_iterator cell, const std::string filename)
 {
     std::ofstream ofs_quadrature_points;
     
@@ -66,7 +76,7 @@ void plot_in_global_coordinates (std::vector<dealii::Point<2>> q_points,
 //___________________________________________
 
 std::vector<double> get_indicator_function_values(const std::vector<dealii::Point<2> > &points,
-                                                  typename dealii::DoFHandler<2>::cell_iterator solution_cell, myPolygon my_poly)
+                                                  const typename dealii::DoFHandler<2>::cell_iterator solution_cell, myPolygon my_poly)
 {
     std::ofstream ofs_indicator_function_values;
     ofs_indicator_function_values.open ("indicator_function_values", std::ofstream::out | std::ofstream::app);

@@ -19,6 +19,7 @@
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/sparse_direct.h>
+#include <deal.II/fe/mapping.h>
 
 
 #include <deal.II/numerics/data_out.h>
@@ -47,53 +48,63 @@ private:
     void solve ();
     void output_results () const;
     void refine_grid();
+
+    const MappingQ1<2> mapping;
     
-    Triangulation<2>     triangulation;
-    FE_Q<2>              fe;
-    DoFHandler<2>        dof_handler;
+    Triangulation<2>     triangulation;                     // triangulation for the solution grid
+    FE_Q<2>              fe;                                // fe for the solution grid
+    DoFHandler<2>        dof_handler;                       // dof handler for the solution grid
     
-    Triangulation<2>   triangulation_adaptiveIntegration; // triangulation for the integration grid
-    FE_Q<2>            fe_adaptiveIntegration; // fe for the integration grid
-    DoFHandler<2>      dof_handler_adaptiveIntegration; // dof handler for the integration grid
+    Triangulation<2>   triangulation_adaptiveIntegration;   // triangulation for the integration grid
+    FE_Q<2>            fe_adaptiveIntegration;              // fe for the integration grid
+    DoFHandler<2>      dof_handler_adaptiveIntegration;     // dof handler for the integration grid
     
     ConstraintMatrix     constraints;
     
     SparsityPattern      sparsity_pattern;
-    SparseMatrix<double> system_matrix;
+    SparseMatrix<double> system_matrix;                     // system/stiffness matrix
     
-    Vector<double>       solution;
-    Vector<double>       system_rhs;
+    Vector<double>       solution;                          // solution/coefficent vector
+    Vector<double>       system_rhs;                        // the right hand side
     
-    myPolygon            my_poly;
+    myPolygon            my_poly;                           // the polygon boundary
 };
 
 Step3::Step3 ()
 :
-fe (1),
+fe (1),                                                     // bilinear
 dof_handler (triangulation),
-fe_adaptiveIntegration (1),
+fe_adaptiveIntegration (1),                                 // bilinear
 dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 {}
 
 
 void Step3::make_grid ()
 {
-    GridGenerator::hyper_cube (triangulation, -2, 2);
+    GridGenerator::hyper_cube (triangulation, -2, 2);       // generate triangulation for solution grid
     triangulation.refine_global (global_refinement_level);
     
-    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2);
-    triangulation_adaptiveIntegration.refine_global (global_refinement_level); // adaptive refinement muss noch implementiert werden
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2); // generate triangulation for integration grid
+    triangulation_adaptiveIntegration.refine_global (global_refinement_level);
     
     std::cout << "Number of active cells: "
     << triangulation.n_active_cells()
     << std::endl;
 }
 
-void Step3::setup_boundary ()
+void Step3::setup_boundary ()                               // setup the polygon boundary
 {
     std::vector<dealii::Point<2>> point_list;
-    point_list = {{0.0,1.0}, {1.0,1.0}, {1.0,0.0}, {1.0,-1.0}, {0.0,-1.0}, {-1.0,-1.0}, {-1.0,0.0}, {-1.0,1.0}, {0.0,1.0}};
-    my_poly.constructPolygon(point_list);
+//    point_list = {{0.0,1.0}, {0.5, 1.0}, {1.0,1.0}, {1.0, 0.5}, {1.0,0.0}, {1.0, -0.5}, {1.0,-1.0}, {0.5, -1.0},
+//                  {0.0,-1.0}, {-0.5, -1.0}, {-1.0,-1.0}, {-1.0, -0.5}, {-1.0,0.0}, {-1.0, 0.5}, {-1.0,1.0}, {-0.5, 1}, {0.0,1.0}};
+    point_list = {{0.0,1.0}, {0.25, 1.0}, {0.5, 1.0}, {0.75, 1.0}, {1.0,1.0}, {1.0, 0.75}, {1.0, 0.5}, {1.0, 0.25}, {1.0,0.0}, {1.0, -0.25},
+                  {1.0, -0.5}, {1.0, -0.75}, {1.0,-1.0}, {0.75, -1.0}, {0.5, -1.0}, {0.25, -1.0},
+                  {0.0,-1.0}, {-0.25, -1.0}, {-0.5, -1.0}, {-0.75, -1.0}, {-1.0,-1.0}, {-1.0, -0.75},
+                  {-1.0, -0.5}, {-1.0, -0.25}, {-1.0,0.0}, {-1.0, 0.25}, {-1.0, 0.5}, {-1.0, 0.75}, {-1.0,1.0},
+                  {-0.75, 1.0}, {-0.5, 1.0}, {-0.25, 1.0}, {0.0,1.0}};
+
+//    point_list = {{0.0,1.0}, {1.0,1.0}, {1.0,0.0}, {1.0,-1.0}, {0.0,-1.0}, {-1.0,-1.0}, {-1.0,0.0}, {-1.0,1.0}, {0.0,1.0}};
+    my_poly.constructPolygon(point_list);                   // construct polygon from list of points
     //    my_poly.list_segments();
     my_poly.save_segments();
     my_poly.save_q_points();
@@ -124,7 +135,6 @@ void Step3::setup_system ()
     sparsity_pattern.copy_from(c_sparsity);
     
     system_matrix.reinit (sparsity_pattern);
-    
     solution.reinit (dof_handler.n_dofs());
     system_rhs.reinit (dof_handler.n_dofs());
 }
@@ -134,26 +144,25 @@ void Step3::assemble_system ()
     QGauss<2>  quadrature_formula(2);
     Quadrature<2> collected_quadrature;                       // the quadrature rule
     Quadrature<2> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
-    std::vector<std::vector<double>> normal_vectors_list;
+
     FEValues<2> fe_values (fe, quadrature_formula,
                            update_values | update_gradients | update_JxW_values);
     
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
     
-    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
-    Vector<double>       cell_rhs (dofs_per_cell);
+    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);    // the cell matrix
+    Vector<double>       cell_rhs (dofs_per_cell);                      // the cell right hand side
     
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
     
     DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
     
-    for (; cell!=endc; ++cell)
+    for (; cell!=endc; ++cell) // iterate over all cells of solution grid
     {
-        fe_values.reinit (cell);
-        
         cell_matrix = 0;
         cell_rhs = 0;
         
+        // colect quadrature on the cell in solution grid
         collected_quadrature = collect_quadratures(topological_equivalent(cell, triangulation_adaptiveIntegration), &quadrature_formula);
         
         // man kann denke ich auch ohne fe values arbeiten...
@@ -163,77 +172,92 @@ void Step3::assemble_system ()
         
         plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
         
-        std::vector<double> indicator_function_values( collected_quadrature.size());
-        
+        // get values of indicator function (alpha)
+        std::vector<double> indicator_function_values(collected_quadrature.size());
         indicator_function_values = get_indicator_function_values(fe_values.get_quadrature().get_points(), cell, my_poly);
         
-        for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index)
+//        double weight_counter = 0.0;
+
+        for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index) // loop over all quadrature points in that cell
         {
-            
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 for (unsigned int j=0; j<dofs_per_cell; ++j)
-                    cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *
+                    cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *        // assemble cell matrix
                                          fe_values.shape_grad (j, q_index) *
                                          indicator_function_values[q_index] *
                                          fe_values.JxW (q_index));
             
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 cell_rhs(i) += (fe_values.shape_value (i, q_index) *
-                                indicator_function_values[q_index] *
+                                indicator_function_values[q_index] *                // assemble cell right hand side
                                 1 *
                                 fe_values.JxW (q_index));
+
+//            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
+//            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
         }
+
+        // Assertion for sum of weihts in cell (= 0.0)
+//        std::cout<<"Sum of weights in cell: "<<weight_counter<<std::endl;
         
         if (contains_boundary(cell, my_poly))
         {
             std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
-            std::cout<<"No. of segment indices: "<<segment_indices.size()<<std::endl;
+//            std::cout<<"No. of segment indices: "<<segment_indices.size()<<std::endl;
 
             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
+                std::cout<<"New segment..."<<std::endl;
+
+                myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
+
                 // Nitsche method
                 
-                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_poly.segment_list[segment_indices[k]], &quadrature_formula);
+                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell, mapping);
                 
                 FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
                 
                 fe_values_on_boundary_segment.reinit(cell);
                 
-                myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
-                
-                
-                for (unsigned int q_index=0; q_index<collected_quadrature_on_boundary_segment.size(); ++q_index)
+                for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index)
                 {
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
                             
-                            std::cout<<"Before Nitsche: "<<cell_matrix(i,j)<<std::endl;
+//                            std::cout<<"Before Nitsche: "<<cell_matrix(i,j)<<std::endl;
                             
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) * //
-                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length * fe_values_on_boundary_segment.JxW (q_index));
-                            
+                                                 fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.normalVector * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
+                                                 fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                  fe_values_on_boundary_segment.shape_grad(i,q_index) *
                                                  my_segment.normalVector *
                                                  my_segment.length*
-                                                 fe_values_on_boundary_segment.JxW (q_index));
+                                                 fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                                                 //fe_values_on_boundary_segment.JxW (q_index));
                             
                             cell_matrix(i,j) +=  beta_h * (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                            my_segment.length *
-                                                           fe_values_on_boundary_segment.JxW (q_index));
+                                                           fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                                                           //fe_values_on_boundary_segment.JxW (q_index));
                             
-                            std::cout<<"After Nitsche: "<<cell_matrix(i,j)<<std::endl;
+//                            std::cout<<"After Nitsche: "<<cell_matrix(i,j)<<std::endl;
                         } // endfor
                         cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) * my_segment.normalVector * my_segment.length *
-                                        fe_values_on_boundary_segment.JxW (q_index));
+                                         fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]); //fe_values_on_boundary_segment.JxW (q_index));
                         cell_rhs(i) +=  (beta_h * fe_values_on_boundary_segment.shape_value(i,q_index) * //
                                          dirichlet_boundary_value * my_segment.length *
-                                         fe_values_on_boundary_segment.JxW (q_index));
+                                         fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                                         //fe_values_on_boundary_segment.JxW (q_index));
                     } // endfor
+
+                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
+                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
                     
                 } // endfor
-                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
+//                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
             }
             
         } // endfor
