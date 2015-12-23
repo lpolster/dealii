@@ -75,6 +75,11 @@
 #include <fstream>
 #include <iostream>
 
+
+// added by me
+#include <deal.II/lac/sparse_direct.h>
+
+
 // ...and this is to import the deal.II namespace into the global scope:
 using namespace dealii;
 
@@ -166,7 +171,7 @@ Step3::Step3 ()
 void Step3::make_grid ()
 {
   GridGenerator::hyper_cube (triangulation, -1, 1);
-  triangulation.refine_global (5);
+  triangulation.refine_global (2);
 
   std::cout << "Number of active cells: "
             << triangulation.n_active_cells()
@@ -548,21 +553,25 @@ void Step3::solve ()
   // find out how many were really used), and stop if the norm of the residual
   // is below $10^{-12}$. In practice, the latter criterion will be the one
   // which stops the iteration:
-  SolverControl           solver_control (1000, 1e-12);
+//  SolverControl           solver_control (1000, 1e-12);
   // Then we need the solver itself. The template parameters to the SolverCG
   // class are the matrix type and the type of the vectors, but the empty
   // angle brackets indicate that we simply take the default arguments (which
   // are <code>SparseMatrix@<double@></code> and
   // <code>Vector@<double@></code>):
-  SolverCG<>              solver (solver_control);
+//  SolverCG<>              solver (solver_control);
 
   // Now solve the system of equations. The CG solver takes a preconditioner
   // as its fourth argument. We don't feel ready to delve into this yet, so we
   // tell it to use the identity operation as preconditioner:
-  solver.solve (system_matrix, solution, system_rhs,
-                PreconditionIdentity());
+//  solver.solve (system_matrix, solution, system_rhs,
+//                PreconditionIdentity());
   // Now that the solver has done its job, the solution variable contains the
   // nodal values of the solution function.
+
+  SparseDirectUMFPACK  A_direct;
+  A_direct.initialize(system_matrix);
+  A_direct.vmult (solution, system_rhs);
 }
 
 
