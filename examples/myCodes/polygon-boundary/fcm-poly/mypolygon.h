@@ -10,6 +10,8 @@
 #include <iostream>
 #include <fstream>
 
+dealii::QGauss<1>  boundary_quadrature(2); // quadrature on boundary
+
 
 //**********************************
 //   1 x-----x-----x
@@ -155,15 +157,16 @@ private:
         dealii::Point<2> q_point;
         std::vector<dealii::Point<2>> q_points;
         
-        q_point = my_segment.beginPoint + ((my_segment.endPoint-my_segment.beginPoint) * 0.211325);
+        for (unsigned int i = 0; i < boundary_quadrature.size(); ++i)
+        {
+        q_point = my_segment.beginPoint + ((my_segment.endPoint-my_segment.beginPoint) * boundary_quadrature.get_points()[i][0]);
         q_points.insert(q_points.end(), q_point);
-        q_point = my_segment.beginPoint + ((my_segment.endPoint-my_segment.beginPoint) * 0.788675);
-        q_points.insert(q_points.end(), q_point);
+        }
         
         return q_points;
     }
     
-    dealii::Point<2> calculate_normals (const segment my_segment) // it needs to be checked whether they are pointing outwards
+    dealii::Point<2> calculate_normals (const segment my_segment) // for polygon defined clockwise
     {
         double dx, dy;
         dx = (my_segment.endPoint[0] - my_segment.beginPoint[0]) / my_segment.length;
@@ -173,7 +176,7 @@ private:
         return normalVector;
     }
     
-    double calculate_distance(segment my_segment, dealii::Point<2> p){
+    double calculate_distance(const segment my_segment, const dealii::Point<2> p){
         double distance = std::abs(my_segment.beginPoint.distance(p)) +  std::abs(my_segment.endPoint.distance(p));
         return distance;
     }

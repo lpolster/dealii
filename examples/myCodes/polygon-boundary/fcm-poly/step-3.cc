@@ -48,8 +48,6 @@ private:
     void solve ();
     void output_results () const;
     void refine_grid();
-
-    const MappingQ1<2> mapping;
     
     Triangulation<2>     triangulation;                     // triangulation for the solution grid
     FE_Q<2>              fe;                                // fe for the solution grid
@@ -81,10 +79,10 @@ dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 
 void Step3::make_grid ()
 {
-    GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
+    GridGenerator::hyper_cube (triangulation, -2, 2);       // generate triangulation for solution grid
     triangulation.refine_global (global_refinement_level);
     
-    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2); // generate triangulation for integration grid
     triangulation_adaptiveIntegration.refine_global (global_refinement_level);
     
     std::cout << "Number of active cells: "
@@ -210,7 +208,7 @@ void Step3::assemble_system ()
 
                 // Nitsche method
                 
-                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell, mapping);
+                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
                 
                 FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
                 
@@ -257,7 +255,6 @@ void Step3::assemble_system ()
         
         
         cell->get_dof_indices (local_dof_indices);
-        
         
         constraints.distribute_local_to_global (cell_matrix,
                                                 cell_rhs,
