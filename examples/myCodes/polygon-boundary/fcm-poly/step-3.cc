@@ -79,10 +79,10 @@ dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 
 void Step3::make_grid ()
 {
-    GridGenerator::hyper_cube (triangulation, -2, 2);       // generate triangulation for solution grid
+    GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
     triangulation.refine_global (global_refinement_level);
     
-    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -2, 2); // generate triangulation for integration grid
+    GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
     triangulation_adaptiveIntegration.refine_global (global_refinement_level);
     
     std::cout << "Number of active cells: "
@@ -280,8 +280,11 @@ void Step3::output_results () const
     data_out.add_data_vector (solution, "solution");
     data_out.build_patches (); // linear interpolation for plotting
     
-    std::ofstream output ("solution.gpl");
-    data_out.write_gnuplot (output);
+    std::ofstream output_gpl ("solution.gpl");
+    data_out.write_gnuplot (output_gpl);
+    
+    std::ofstream output_vtk ("solution.vtk");
+    data_out.write_vtk (output_vtk);
 }
 
 
