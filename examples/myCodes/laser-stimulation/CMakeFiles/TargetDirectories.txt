@@ -1,0 +1,8 @@
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/debug.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/distclean.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/info.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/release.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/run.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/runclean.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/step-3.dir
+/home/lisa/Desktop/dealii/examples/myCodes/laser-stimulation/CMakeFiles/strip_comments.dir
