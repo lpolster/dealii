@@ -1,3 +1,6 @@
+// The finicte cell method on a rectangle. The boundary is given as a polygon (list of vertices clockwise). There is a vertex at least at every cell boundary.
+// Poisson problem. Rhs = 1.0. Homogeneous Dirichlet boundary conditions (0.0).
+// Nitsche Method for boundary condition.
 
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -15,7 +18,8 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+//#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/sparse_direct.h>
@@ -30,6 +34,7 @@
 #include "find_cells.h"
 
 
+namespace FCMImplementation{ // use namespace to avoid the problems that result if names of different functions or variables collide
 using namespace dealii;
 
 
@@ -43,69 +48,56 @@ public:
 private:
     void make_grid ();
     void setup_system ();
-    void setup_boundary ();
+    void setup_grid_and_boundary ();
     void assemble_system ();
     void solve ();
     void output_results () const;
     void refine_grid();
     
-    Triangulation<2>     triangulation;                     // triangulation for the solution grid
-    FE_Q<2>              fe;                                // fe for the solution grid
-    DoFHandler<2>        dof_handler;                       // dof handler for the solution grid
+    Triangulation<2>                triangulation;                     // triangulation for the solution grid
+    FE_Q<2>                         fe;                                // fe for the solution grid
+    DoFHandler<2>                    dof_handler;                       // dof handler for the solution grid
     
-    Triangulation<2>   triangulation_adaptiveIntegration;   // triangulation for the integration grid
-    FE_Q<2>            fe_adaptiveIntegration;              // fe for the integration grid
-    DoFHandler<2>      dof_handler_adaptiveIntegration;     // dof handler for the integration grid
+    Triangulation<2>                triangulation_adaptiveIntegration;   // triangulation for the integration grid
+    FE_Q<2>                         fe_adaptiveIntegration;              // fe for the integration grid
+    DoFHandler<2>                   dof_handler_adaptiveIntegration;     // dof handler for the integration grid
     
-    ConstraintMatrix     constraints;
+    ConstraintMatrix                constraints;
     
-    SparsityPattern      sparsity_pattern;
-    SparseMatrix<double> system_matrix;                     // system/stiffness matrix
+    SparsityPattern                 sparsity_pattern;
+    SparseMatrix<double>            system_matrix;                     // system/stiffness matrix
     
-    Vector<double>       solution;                          // solution/coefficent vector
-    Vector<double>       system_rhs;                        // the right hand side
+    Vector<double>                  solution;                          // solution/coefficent vector
+    Vector<double>                  system_rhs;                        // the right hand side
     
-    myPolygon            my_poly;                           // the polygon boundary
+    myPolygon                       my_poly;                           // the polygon boundary
+    std::vector<dealii::Point<2>>   point_list;
+
 };
 
 Step3::Step3 ()
-:
-fe (1),                                                     // bilinear
-dof_handler (triangulation),
-fe_adaptiveIntegration (1),                                 // bilinear
-dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
+    :
+      fe (1),                                                     // bilinear
+      dof_handler (triangulation),
+      fe_adaptiveIntegration (1),                                 // bilinear
+      dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 {}
 
 
-void Step3::make_grid ()
+void Step3::setup_grid_and_boundary ()
 {
+    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}};
+
+//    point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
     GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
-    triangulation.refine_global (global_refinement_level);
-    
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
-    triangulation_adaptiveIntegration.refine_global (global_refinement_level);
-    
-    std::cout << "Number of active cells: "
-    << triangulation.n_active_cells()
-    << std::endl;
-}
 
-void Step3::setup_boundary ()                               // setup the polygon boundary
-{
-    std::vector<dealii::Point<2>> point_list;
-//    point_list = {{0.0,1.0}, {0.5, 1.0}, {1.0,1.0}, {1.0, 0.5}, {1.0,0.0}, {1.0, -0.5}, {1.0,-1.0}, {0.5, -1.0},
-//                  {0.0,-1.0}, {-0.5, -1.0}, {-1.0,-1.0}, {-1.0, -0.5}, {-1.0,0.0}, {-1.0, 0.5}, {-1.0,1.0}, {-0.5, 1}, {0.0,1.0}};
-    point_list = {{0.0,1.0}, {0.25, 1.0}, {0.5, 1.0}, {0.75, 1.0}, {1.0,1.0}, {1.0, 0.75}, {1.0, 0.5}, {1.0, 0.25}, {1.0,0.0}, {1.0, -0.25},
-                  {1.0, -0.5}, {1.0, -0.75}, {1.0,-1.0}, {0.75, -1.0}, {0.5, -1.0}, {0.25, -1.0},
-                  {0.0,-1.0}, {-0.25, -1.0}, {-0.5, -1.0}, {-0.75, -1.0}, {-1.0,-1.0}, {-1.0, -0.75},
-                  {-1.0, -0.5}, {-1.0, -0.25}, {-1.0,0.0}, {-1.0, 0.25}, {-1.0, 0.5}, {-1.0, 0.75}, {-1.0,1.0},
-                  {-0.75, 1.0}, {-0.5, 1.0}, {-0.25, 1.0}, {0.0,1.0}};
-
-//    point_list = {{0.0,1.0}, {1.0,1.0}, {1.0,0.0}, {1.0,-1.0}, {0.0,-1.0}, {-1.0,-1.0}, {-1.0,0.0}, {-1.0,1.0}, {0.0,1.0}};
-    my_poly.constructPolygon(point_list);                   // construct polygon from list of points
-    //    my_poly.list_segments();
-    my_poly.save_segments();
-    my_poly.save_q_points();
+    for (unsigned int i = 0; i< global_refinement_level; i++)
+    {
+        triangulation.refine_global (1);
+        triangulation_adaptiveIntegration.refine_global (1);
+        point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
+    }
 }
 
 void Step3::setup_system ()
@@ -117,20 +109,15 @@ void Step3::setup_system ()
     constraints.clear ();
     DoFTools::make_hanging_node_constraints (dof_handler,
                                              constraints);
-    // Toggle comment for fcm
-    //    VectorTools::interpolate_boundary_values (dof_handler,
-    //                                              0,
-    //                                              ZeroFunction<2>(),
-    //                                              constraints);
     constraints.close ();
     
     
-    CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+    DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern(dof_handler,
-                                    c_sparsity,
+                                    dsp,
                                     constraints,
-                                    /*keep_constrained_dofs = */ false);
-    sparsity_pattern.copy_from(c_sparsity);
+                                    /*keep_constrained_dofs = */ true);
+    sparsity_pattern.copy_from (dsp);
     
     system_matrix.reinit (sparsity_pattern);
     solution.reinit (dof_handler.n_dofs());
@@ -171,7 +158,7 @@ void Step3::assemble_system ()
         std::vector<double> indicator_function_values(collected_quadrature.size());
         indicator_function_values = get_indicator_function_values(fe_values.get_quadrature().get_points(), cell, my_poly);
         
-//        double weight_counter = 0.0;
+        //        double weight_counter = 0.0;
 
         for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index) // loop over all quadrature points in that cell
         {
@@ -188,21 +175,21 @@ void Step3::assemble_system ()
                                 1 *
                                 fe_values.JxW (q_index));
 
-//            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
-//            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
+            //            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
+            //            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
         }
 
         // Assertion for sum of weihts in cell (= 0.0)
-//        std::cout<<"Sum of weights in cell: "<<weight_counter<<std::endl;
+        //        std::cout<<"Sum of weights in cell: "<<weight_counter<<std::endl;
         
         if (contains_boundary(cell, my_poly))
         {
             std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
-//            std::cout<<"No. of segment indices: "<<segment_indices.size()<<std::endl;
+            //            std::cout<<"No. of segment indices: "<<segment_indices.size()<<std::endl;
 
             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
-                std::cout<<"New segment..."<<std::endl;
+//                std::cout<<"New segment..."<<std::endl;
 
                 myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
 
@@ -218,7 +205,7 @@ void Step3::assemble_system ()
                 {
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
-                                                        
+
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                  my_segment.normalVector *
                                                  fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
@@ -244,11 +231,11 @@ void Step3::assemble_system ()
                                          fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
                     } // endfor
 
-                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
-                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
+//                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
+//                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
                     
                 } // endfor
-//                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
+                //                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
             }
             
         } // endfor
@@ -267,9 +254,14 @@ void Step3::assemble_system ()
 
 void Step3::solve ()
 {
-    SparseDirectUMFPACK  A_direct;
-    A_direct.initialize(system_matrix);
-    A_direct.vmult (solution, system_rhs);
+    //    SparseDirectUMFPACK  A_direct;              // use direct solver
+    //    A_direct.initialize(system_matrix);
+    //    A_direct.vmult (solution, system_rhs);
+
+    SolverControl           solver_control (1000, 1e-12);
+    SolverCG<>              solver (solver_control);
+    solver.solve (system_matrix, solution, system_rhs,
+                  PreconditionIdentity());
 }
 
 
@@ -302,10 +294,11 @@ void output_grid(const dealii::Triangulation<2>& tria,
 void Step3::refine_grid ()
 {
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
-    
+    myPolygon  my_poly;
+    my_poly.constructPolygon(point_list);
     typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
-    cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
-    endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
+            cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
+            endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
     
     for (; cell!=endc; ++cell) // loop over all active cells
     {
@@ -321,31 +314,66 @@ void Step3::refine_grid ()
 
 void Step3::run ()
 {
-    make_grid ();
-    setup_boundary ();
+    setup_grid_and_boundary ();
     
     for (unsigned int i = 0; i < refinement_cycles; i++)
     {
-        refine_grid ();
+        refine_grid();
+        point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
         output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i);
-        
     }
+
+    my_poly.constructPolygon(point_list);                   // construct polygon from list of points
+    //    my_poly.list_segments();
+    my_poly.save_segments();
+    my_poly.save_q_points();
     
     setup_system ();
     assemble_system ();
     solve ();
     output_results ();
 }
+}
 
 
 int main ()
 {
-    std::remove("indicator_function_values");
-    std::remove("collected_quadrature");
+    try
+    {
+        using namespace dealii;
+        using namespace FCMImplementation;
+
+        std::remove("indicator_function_values");
+        std::remove("collected_quadrature");
 
 
-    Step3 laplace_problem;
-    laplace_problem.run ();
+        Step3 laplace_problem;
+        laplace_problem.run ();
+    }
+
+    catch (std::exception &exc)
+    {
+        std::cerr << std::endl << std::endl
+                  << "----------------------------------------------------"
+                  << std::endl;
+        std::cerr << "Exception on processing: " << std::endl
+                  << exc.what() << std::endl
+                  << "Aborting!" << std::endl
+                  << "----------------------------------------------------"
+                  << std::endl;
+        return 1;
+    }
+    catch (...)
+    {
+        std::cerr << std::endl << std::endl
+                  << "----------------------------------------------------"
+                  << std::endl;
+        std::cerr << "Unknown exception!" << std::endl
+                  << "Aborting!" << std::endl
+                  << "----------------------------------------------------"
+                  << std::endl;
+        return 1;
+    }
     
     return 0;
 }

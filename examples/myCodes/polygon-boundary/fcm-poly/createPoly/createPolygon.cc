@@ -16,6 +16,8 @@
 #include "mypolygon.h"
 #include "fcm-tools.h"
 
+//#define MY_DEBUG_DEF
+
 using namespace dealii;
 
 class createPolygon
@@ -30,14 +32,12 @@ private:
     FE_Q<2>              fe;                                // fe for the solution grid
     DoFHandler<2>        dof_handler;                       // dof handler for the solution grid
     myPolygon            my_poly;                           // the polygon boundary
-
-
 };
 
 createPolygon::createPolygon()
     :
-    fe (1),                                                     // bilinear
-    dof_handler (triangulation)
+      fe (1),                                                     // bilinear
+      dof_handler (triangulation)
 {}
 
 void createPolygon::refine_grid (std::vector<dealii::Point<2>> point_list)
@@ -45,8 +45,8 @@ void createPolygon::refine_grid (std::vector<dealii::Point<2>> point_list)
     myPolygon  my_poly;
     my_poly.constructPolygon(point_list);                   // construct polygon from list of points
     typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
-    cell = dof_handler.begin_active(), // the first active cell
-    endc = dof_handler.end(); // one past the last active cell
+            cell = dof_handler.begin_active(), // the first active cell
+            endc = dof_handler.end(); // one past the last active cell
 
     for (; cell!=endc; ++cell) // loop over all active cells
     {
@@ -67,18 +67,18 @@ void createPolygon::run()
 
     std::vector<dealii::Point<2>> point_list;
     point_list = {{0.1,0.9}, {0.6, -0.4}, {-0.2, -0.8}, {0.1,0.9}};
-//    point_list = {{-0.6,0.6}, {0.7, 0.7}, {-0.8,-0.8}, {-0.6, 0.6}}; //{0.4, -0.4},
+    //    point_list = {{-0.6,0.6}, {0.7, 0.7}, {-0.8,-0.8}, {-0.6, 0.6}}; //{0.4, -0.4},
 
-//    point_list = {{-0.4,0.4}, {0.4, 0.4},{0.4, -0.4}, {-0.4,-0.4}, {-0.4,0.4}};
+    //    point_list = {{-0.4,0.4}, {0.4, 0.4},{0.4, -0.4}, {-0.4,-0.4}, {-0.4,0.4}};
 
-//    point_list = {{-0.4,0.4}, {0.4, 0.4}, {-0.4,-0.4}, {-0.4,0.4}};
+    //    point_list = {{-0.4,0.4}, {0.4, 0.4}, {-0.4,-0.4}, {-0.4,0.4}};
 
     for (unsigned int i = 0; i < 3; i++)
     {
 
-    triangulation.refine_global (1);
+        triangulation.refine_global (1);
 
-    point_list = update_point_list(point_list, triangulation);
+        point_list = update_point_list(point_list, triangulation);
     }
 
     GridOut grid_out;
@@ -91,14 +91,13 @@ void createPolygon::run()
 
     for (unsigned int i = 0; i<4; i++)
     {
-    std::cout<<"Refinement no. "<<i<<std::endl;
-    refine_grid( point_list);
-    point_list = update_point_list(point_list, triangulation);
-    GridOut grid_out;
-    std::stringstream filename;
-    filename << "grid - " <<i<< ".svg";
-    std::ofstream out(filename.str());
-    grid_out.write_svg(triangulation, out);
+        refine_grid( point_list);
+        point_list = update_point_list(point_list, triangulation);
+        GridOut grid_out;
+        std::stringstream filename;
+        filename << "grid - " <<i<< ".svg";
+        std::ofstream out(filename.str());
+        grid_out.write_svg(triangulation, out);
     }
 
     my_poly.constructPolygon(point_list);                   // construct polygon from list of points
@@ -111,8 +110,12 @@ void createPolygon::run()
 
 int main()
 {
-
     createPolygon polygon_creator;
     polygon_creator.run();
+
+#ifdef MY_DEBUG_DEF
+    std::cout << "This is only printed if MY_DEBUG_DEF is defined\n";
+#endif
+
     return 0;
 }

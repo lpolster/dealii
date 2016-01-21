@@ -1,7 +1,7 @@
 const unsigned int global_refinement_level = 3;              // the level of global refininement (solution grid)
 const float beta_h = 20.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
 const float dirichlet_boundary_value = 0.0000;               // the Duruchlet boundary condition
-const unsigned int refinement_cycles = 2;                    // the number of cycles of adaptive refinement
+const unsigned int refinement_cycles = 3;                    // the number of cycles of adaptive refinement
 const dealii::MappingQ1<2> mapping;
 
 //___________________________________________
@@ -23,13 +23,13 @@ dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2
     {
         // get child
         typename dealii::Triangulation<2>::cell_iterator child_cell =
-        cell->child(child);
+                cell->child(child);
         // collect sub-quadratures
         dealii::Quadrature<2> childs_collected_quadratures =
-        collect_quadratures(child_cell, base_quadrature);
+                collect_quadratures(child_cell, base_quadrature);
         // project to current cell
         dealii::Quadrature<2> child_quadrature =
-        dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+                dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
         // collect resulting quadrature
         q_points.insert(q_points.end(),
                         child_quadrature.get_points().begin(),
@@ -104,9 +104,116 @@ bool contains_boundary (const typename dealii::DoFHandler<2>::cell_iterator cell
         if (my_poly.is_inside(cell->vertex(vertex_iterator)))
             vertex_tracker++;
     }
+//    std::cout<<", vertex tracker: "<<vertex_tracker<<std::endl;
     if (vertex_tracker == 0 || vertex_tracker == 4)
         return false;
     else
         return true;
 }
 //_____________________________________________
+std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point<2>> point_list, const typename dealii::Triangulation<2> &triangulation)
+{
+
+    std::vector<dealii::Point<2>> updated_point_list;
+
+    for (unsigned int i = 0; i < point_list.size()-1; i++)
+    {
+
+        dealii::Point<2> start_point = point_list[i];
+        dealii::Point<2> end_point = point_list[i+1];
+
+        std::pair<dealii::Triangulation<2>::active_cell_iterator, dealii::Point<2> >
+                cell_around_start_point = dealii::GridTools::find_active_cell_around_point (mapping, triangulation, start_point);
+
+        std::pair<dealii::Triangulation<2>::active_cell_iterator, dealii::Point<2> >
+                cell_around_end_point = dealii::GridTools::find_active_cell_around_point (mapping, triangulation,end_point);
+
+#ifdef MY_DEBUG_DEF
+        std::cout<<"["<<start_point<<"], ["<<end_point<<"]"<<std::endl;
+#endif
+
+        dealii::Point<2> intersection_x;
+        dealii::Point<2> intersection_y;
+
+        if(start_point[1] >= end_point[1])
+        {
+            intersection_x[1] = cell_around_start_point.first->parent()->vertex(0)[1] +
+                    0.5 * std::abs(cell_around_start_point.first->parent()->vertex(2)[1] - cell_around_start_point.first->parent()->vertex(0)[1]);
+        }
+        else
+        {
+            intersection_x[1] = cell_around_end_point.first->parent()->vertex(0)[1] +
+                    0.5 * std::abs(cell_around_end_point.first->parent()->vertex(2)[1] - cell_around_end_point.first->parent()->vertex(0)[1]);
+        }
+
+        intersection_x[0] = (intersection_x[1]  - start_point[1] )/ (end_point[1] - start_point[1]);
+        intersection_x[0] = start_point[0] +  ( intersection_x[0] * (end_point[0] - start_point[0]));
+
+        if (start_point[0] >= end_point[0])
+        {
+            intersection_y[0] = cell_around_start_point.first->parent()->vertex(0)[0] +
+                    0.5 * std::abs(cell_around_start_point.first->parent()->vertex(1)[0] - cell_around_start_point.first->parent()->vertex(0)[0]);
+        }
+        else
+        {
+            intersection_y[0] = cell_around_end_point.first->parent()->vertex(0)[0] +
+                    0.5 * std::abs(cell_around_end_point.first->parent()->vertex(1)[0] - cell_around_end_point.first->parent()->vertex(0)[0]);
+        }
+
+        intersection_y[1] = (intersection_y[0]  - start_point[0] )/ (end_point[0] - start_point[0]);
+        intersection_y[1] = start_point[1] +  ( intersection_y[1] * (end_point[1] - start_point[1]));
+
+#ifdef MY_DEBUG_DEF
+        std::cout<<"Intersect x = "<<intersection_x<<std::endl;
+        std::cout<<"Intersect y = "<<intersection_y<<std::endl;
+#endif
+
+        bool valid_intersection_x;
+        bool valid_intersection_y;
+
+        if (intersection_y[0] <= std::max(start_point[0], end_point[0]) && intersection_y[0] >= std::min(start_point[0], end_point[0]) &&
+                intersection_y[1] <= std::max(start_point[1], end_point[1]) && intersection_y[1] >= std::min(start_point[1], end_point[1]))
+            valid_intersection_y = true;
+        else
+            valid_intersection_y = false;
+
+
+        if (intersection_x[0] <= std::max(start_point[0], end_point[0]) && intersection_x[0] >= std::min(start_point[0], end_point[0]) &&
+                intersection_x[1] <= std::max(start_point[1], end_point[1]) && intersection_x[1] >= std::min(start_point[1], end_point[1]))
+            valid_intersection_x = true;
+        else
+            valid_intersection_x = false;
+
+#ifdef MY_DEBUG_DEF
+        std::cout<<valid_intersection_x<<" "<<valid_intersection_y<<std::endl;
+#endif
+
+        updated_point_list.insert(updated_point_list.end(), start_point);
+
+        if (valid_intersection_x && valid_intersection_y)
+        {
+            if (std::abs(start_point.distance(intersection_x)) < std::abs(start_point.distance(intersection_y)))
+            {
+                updated_point_list.insert(updated_point_list.end(), intersection_x);
+                updated_point_list.insert(updated_point_list.end(), intersection_y);
+            }
+            else if (std::abs(start_point.distance(intersection_x)) > std::abs(start_point.distance(intersection_y)))
+            {
+                updated_point_list.insert(updated_point_list.end(), intersection_y);
+                updated_point_list.insert(updated_point_list.end(), intersection_x);
+            }
+            else
+                updated_point_list.insert(updated_point_list.end(), intersection_y);
+        }
+
+        else if (valid_intersection_x)
+            updated_point_list.insert(updated_point_list.end(), intersection_x);
+        else if (valid_intersection_y)
+            updated_point_list.insert(updated_point_list.end(), intersection_y);
+    }
+
+    updated_point_list.insert(updated_point_list.end(), point_list[point_list.size()-1]);
+
+    return updated_point_list;
+
+}

@@ -62,11 +62,11 @@ public:
     }
     
     void list_segments(){
-        std::cout<<"Listing segments: "<<std::endl;
+     //   std::cout<<"Listing segments: "<<std::endl;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
-            std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
+           // std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
         }
     }
     

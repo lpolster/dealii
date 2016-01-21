@@ -66,7 +66,7 @@ public:
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
-            std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
+//            std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
         }
     }
     
@@ -99,7 +99,7 @@ public:
                 closest_segment = my_segment;
             }
         }
-        std::cout<<" closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
+//        std::cout<<" closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
 //        std::cout<<"Min Distance: "<<minimum_distance<<std::endl;
         dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
         
