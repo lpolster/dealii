@@ -1,8 +1,12 @@
 const unsigned int global_refinement_level = 3;              // the level of global refininement (solution grid)
-const float beta_h = 20.0/(1.0/ global_refinement_level);    // beta divided by h, 2.0/0.0625
+const unsigned int polynomial_degree = 1;
+//const float beta_h = 20.0/(1.0/ global_refinement_level);    // beta
+const float beta_h = (2.0 * polynomial_degree * (polynomial_degree+1))/(1.0/ global_refinement_level);    // beta divided by h, 2*p*(p+1)/h
 const float dirichlet_boundary_value = 0.0000;               // the Duruchlet boundary condition
 const unsigned int refinement_cycles = 3;                    // the number of cycles of adaptive refinement
 const dealii::MappingQ1<2> mapping;
+const double alpha = 1e-5;				     // between 1e-4 and 1e-15
+
 
 //___________________________________________
 dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2>::cell_iterator cell,
@@ -90,7 +94,7 @@ std::vector<double> get_indicator_function_values(const std::vector<dealii::Poin
         if (my_poly.is_inside(q_point_in_global_coordinates)) // point is in physical domain (circle with radius 0.4)
             indicator_function_values[i] = 1; // indicates physical domain
         else
-            indicator_function_values[i] = 1e-8; // indicates fictitous domain
+            indicator_function_values[i] = alpha; // indicates fictitous domain
         
         ofs_indicator_function_values << q_point_in_global_coordinates << " " << indicator_function_values[i] << std::endl;
     }

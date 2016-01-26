@@ -24,11 +24,14 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/sparse_direct.h>
 #include <deal.II/fe/mapping.h>
+#include <deal.II/lac/sparsity_pattern.h>
+
 
 
 #include <deal.II/numerics/data_out.h>
 #include <fstream>
 #include <iostream>
+#include <math.h>
 #include "mypolygon.h"
 #include "fcm-tools.h"
 #include "find_cells.h"
@@ -73,11 +76,15 @@ private:
     myPolygon                       my_poly;                           // the polygon boundary
     std::vector<dealii::Point<2>>   point_list;
 
+    void print_cond(double cond);
+    void output_matrix();
+
+
 };
 
 Step3::Step3 ()
     :
-      fe (1),                                                     // bilinear
+      fe (polynomial_degree),                                                     // bilinear
       dof_handler (triangulation),
       fe_adaptiveIntegration (1),                                 // bilinear
       dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
@@ -86,9 +93,12 @@ Step3::Step3 ()
 
 void Step3::setup_grid_and_boundary ()
 {
-    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}};
+    //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}};
+    //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
+    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9,0.9}};
 
-//    point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
+
+    //point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
     GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
 
@@ -126,7 +136,7 @@ void Step3::setup_system ()
 
 void Step3::assemble_system ()
 {
-    QGauss<2>  quadrature_formula(2);
+    QGauss<2>  quadrature_formula(polynomial_degree+1);
     Quadrature<2> collected_quadrature;                       // the quadrature rule
     Quadrature<2> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
     
@@ -144,7 +154,7 @@ void Step3::assemble_system ()
         cell_matrix = 0;
         cell_rhs = 0;
         
-        // colect quadrature on the cell in solution grid
+        // collect quadrature on the cell in solution grid
         collected_quadrature = collect_quadratures(topological_equivalent(cell, triangulation_adaptiveIntegration), &quadrature_formula);
         
         // man kann denke ich auch ohne fe values arbeiten...
@@ -163,11 +173,13 @@ void Step3::assemble_system ()
         for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index) // loop over all quadrature points in that cell
         {
             for (unsigned int i=0; i<dofs_per_cell; ++i)
-                for (unsigned int j=0; j<dofs_per_cell; ++j)
+                for (unsigned int j=0; j<dofs_per_cell; ++j){
                     cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *        // assemble cell matrix
                                          fe_values.shape_grad (j, q_index) *
                                          indicator_function_values[q_index] *
                                          fe_values.JxW (q_index));
+                    Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+                }
             
             for (unsigned int i=0; i<dofs_per_cell; ++i)
                 cell_rhs(i) += (fe_values.shape_value (i, q_index) *
@@ -189,7 +201,7 @@ void Step3::assemble_system ()
 
             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
-//                std::cout<<"New segment..."<<std::endl;
+                //                std::cout<<"New segment..."<<std::endl;
 
                 myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
 
@@ -221,6 +233,8 @@ void Step3::assemble_system ()
                                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                            my_segment.length *
                                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                            Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j)))); // here is the problem!!!!
+
                             
                         } // endfor
                         cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) *
@@ -231,8 +245,8 @@ void Step3::assemble_system ()
                                          fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
                     } // endfor
 
-//                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
-//                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
+                    //                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
+                    //                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
                     
                 } // endfor
                 //                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
@@ -249,8 +263,35 @@ void Step3::assemble_system ()
                                                 system_matrix,
                                                 system_rhs);
     }
+    std::ofstream ofs_system_matrix;
+    ofs_system_matrix.open ("matrix.txt", std::ofstream::out);
+    system_matrix.print(ofs_system_matrix);
+    ofs_system_matrix.close();
+
+    std::ofstream ofs_sparsity_pattern;
+    ofs_sparsity_pattern.open ("sparsity_pattern.txt", std::ofstream::out);
+    system_matrix.print_pattern(ofs_sparsity_pattern);
+    ofs_sparsity_pattern.close();
 }
 
+//void Step3::output_matrix()
+//{
+//    std::ofstream ofs_system_matrix;
+//    ofs_system_matrix.open ("matrix.txt", std::ofstream::out | std::ofstream::app);
+//    for (unsigned int i = 0; i < system_matrix.size(); ++i){
+//        for (unsigned int j = 0; j < system_matrix.size(); ++j)
+//            ofs_system_matrix<<system_matrix[i][j];
+//        std::endl;
+//    }
+//    ofs_system_matrix.close();
+
+//}
+
+
+void Step3::print_cond(double cond){
+    std::cout<<"cond="<<cond <<std::endl;
+    //or save the condition number, whatever you want to do.
+}
 
 void Step3::solve ()
 {
@@ -260,6 +301,9 @@ void Step3::solve ()
 
     SolverControl           solver_control (1000, 1e-12);
     SolverCG<>              solver (solver_control);
+
+    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
+
     solver.solve (system_matrix, solution, system_rhs,
                   PreconditionIdentity());
 }
@@ -330,8 +374,8 @@ void Step3::run ()
     
     setup_system ();
     assemble_system ();
-    solve ();
-    output_results ();
+    //    solve ();
+    //    output_results ();
 }
 }
 
