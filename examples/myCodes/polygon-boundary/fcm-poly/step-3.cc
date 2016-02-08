@@ -93,12 +93,12 @@ Step3::Step3 ()
 
 void Step3::setup_grid_and_boundary ()
 {
-    //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}};
-    //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
-    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9,0.9}};
+    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}}; // this is working
+    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
+    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9,0.9}};
+    // point_list = {{-0.9,0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
 
-
-    //point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
+    point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
     GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
 
@@ -178,14 +178,17 @@ void Step3::assemble_system ()
                                          fe_values.shape_grad (j, q_index) *
                                          indicator_function_values[q_index] *
                                          fe_values.JxW (q_index));
-                    Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+                   // std::cout<<"Cell: "<<cell->index()<<", q_index: "<<q_index<<", (i,j): ("<<i<<","<<j<<")"<<std::endl;
+                   Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
                 }
             
-            for (unsigned int i=0; i<dofs_per_cell; ++i)
+            for (unsigned int i=0; i<dofs_per_cell; ++i){
                 cell_rhs(i) += (fe_values.shape_value (i, q_index) *
                                 indicator_function_values[q_index] *                // assemble cell right hand side
                                 1 *
                                 fe_values.JxW (q_index));
+                Assert(std::isfinite(cell_rhs(i)), ExcNumberNotFinite(std::complex<double>(cell_rhs(i))));
+            }
 
             //            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
             //            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
@@ -217,7 +220,7 @@ void Step3::assemble_system ()
                 {
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
-
+    
                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                  my_segment.normalVector *
                                                  fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
@@ -233,8 +236,6 @@ void Step3::assemble_system ()
                                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
                                                            my_segment.length *
                                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-                            Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j)))); // here is the problem!!!!
-
                             
                         } // endfor
                         cell_rhs(i) -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) *
@@ -244,12 +245,8 @@ void Step3::assemble_system ()
                                          dirichlet_boundary_value * my_segment.length *
                                          fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
                     } // endfor
-
-                    //                    std::cout<<fe_values_on_boundary_segment.get_quadrature().get_points()[q_index]<<" "<<
-                    //                               fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]<<std::endl;
                     
                 } // endfor
-                //                std::cout<<"Cell nr. "<<cell->index()<<"contains segment "<<segment_indices[k]<<std::endl;
             }
             
         } // endfor
@@ -295,17 +292,17 @@ void Step3::print_cond(double cond){
 
 void Step3::solve ()
 {
-    //    SparseDirectUMFPACK  A_direct;              // use direct solver
-    //    A_direct.initialize(system_matrix);
-    //    A_direct.vmult (solution, system_rhs);
+        SparseDirectUMFPACK  A_direct;              // use direct solver
+        A_direct.initialize(system_matrix);
+        A_direct.vmult (solution, system_rhs);
 
-    SolverControl           solver_control (1000, 1e-12);
-    SolverCG<>              solver (solver_control);
+//    SolverControl           solver_control (100000, 1e-12);
+//    SolverCG<>              solver (solver_control);
+//
+//    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
 
-    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
-
-    solver.solve (system_matrix, solution, system_rhs,
-                  PreconditionIdentity());
+//    solver.solve (system_matrix, solution, system_rhs,
+//                  PreconditionIdentity());
 }
 
 
@@ -374,8 +371,8 @@ void Step3::run ()
     
     setup_system ();
     assemble_system ();
-    //    solve ();
-    //    output_results ();
+    solve ();
+    output_results ();
 }
 }
 

@@ -1,4 +1,4 @@
-const unsigned int global_refinement_level = 3;              // the level of global refininement (solution grid)
+const unsigned int global_refinement_level = 5;              // the level of global refininement (solution grid)
 const unsigned int polynomial_degree = 1;
 //const float beta_h = 20.0/(1.0/ global_refinement_level);    // beta
 const float beta_h = (2.0 * polynomial_degree * (polynomial_degree+1))/(1.0/ global_refinement_level);    // beta divided by h, 2*p*(p+1)/h
@@ -108,7 +108,7 @@ bool contains_boundary (const typename dealii::DoFHandler<2>::cell_iterator cell
         if (my_poly.is_inside(cell->vertex(vertex_iterator)))
             vertex_tracker++;
     }
-//    std::cout<<", vertex tracker: "<<vertex_tracker<<std::endl;
+    //std::cout<<"cell: "<<cell<<", vertex tracker: "<<vertex_tracker<<std::endl;
     if (vertex_tracker == 0 || vertex_tracker == 4)
         return false;
     else
@@ -139,6 +139,7 @@ std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point
         dealii::Point<2> intersection_x;
         dealii::Point<2> intersection_y;
 
+        // get the intersection in x direction
         if(start_point[1] >= end_point[1])
         {
             intersection_x[1] = cell_around_start_point.first->parent()->vertex(0)[1] +
@@ -153,6 +154,7 @@ std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point
         intersection_x[0] = (intersection_x[1]  - start_point[1] )/ (end_point[1] - start_point[1]);
         intersection_x[0] = start_point[0] +  ( intersection_x[0] * (end_point[0] - start_point[0]));
 
+        // get the intersection in y direction
         if (start_point[0] >= end_point[0])
         {
             intersection_y[0] = cell_around_start_point.first->parent()->vertex(0)[0] +
@@ -176,14 +178,14 @@ std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point
         bool valid_intersection_y;
 
         if (intersection_y[0] <= std::max(start_point[0], end_point[0]) && intersection_y[0] >= std::min(start_point[0], end_point[0]) &&
-                intersection_y[1] <= std::max(start_point[1], end_point[1]) && intersection_y[1] >= std::min(start_point[1], end_point[1]))
+                intersection_y[1] <= std::max(start_point[1], end_point[1]) && intersection_y[1] >= std::min(start_point[1], end_point[1]) && intersection_y != start_point && intersection_y != end_point)
             valid_intersection_y = true;
         else
             valid_intersection_y = false;
 
 
         if (intersection_x[0] <= std::max(start_point[0], end_point[0]) && intersection_x[0] >= std::min(start_point[0], end_point[0]) &&
-                intersection_x[1] <= std::max(start_point[1], end_point[1]) && intersection_x[1] >= std::min(start_point[1], end_point[1]))
+                intersection_x[1] <= std::max(start_point[1], end_point[1]) && intersection_x[1] >= std::min(start_point[1], end_point[1]) && intersection_x != start_point && intersection_x != end_point)
             valid_intersection_x = true;
         else
             valid_intersection_x = false;

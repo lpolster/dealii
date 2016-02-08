@@ -6,6 +6,7 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
 
+#include <assert.h>
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -41,7 +42,7 @@ public:
             segment my_segment;
             my_segment.beginPoint = point_list[i];
             my_segment.endPoint = point_list[i+1];
-            my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint));
+            my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint)); assert(my_segment.length > 0);
             my_segment.q_points = calculate_q_points(my_segment);
             my_segment.normalVector = calculate_normals(my_segment);
             
@@ -62,11 +63,11 @@ public:
     }
     
     void list_segments(){
-     //   std::cout<<"Listing segments: "<<std::endl;
+        std::cout<<"Listing segments: "<<std::endl;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
-           // std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
+            std::cout<<"["<<my_segment.beginPoint<<"]"<<" "<<"["<<my_segment.endPoint<<"]"<<std::endl;
         }
     }
     
@@ -171,7 +172,11 @@ private:
         double dx, dy;
         dx = (my_segment.endPoint[0] - my_segment.beginPoint[0]) / my_segment.length;
         dy = (my_segment.endPoint[1] - my_segment.beginPoint[1]) / my_segment.length;
+
         dealii::Point<2> normalVector = {-dy, dx};
+        
+        Assert(std::isfinite(normalVector[0]), dealii::ExcNumberNotFinite(std::complex<double>(normalVector[0])));
+        Assert(std::isfinite(normalVector[1]), dealii::ExcNumberNotFinite(std::complex<double>(normalVector[1])));
         
         return normalVector;
     }
