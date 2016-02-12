@@ -583,6 +583,7 @@ int main ()
         
         Step3 laplace_problem;
         laplace_problem.run ();
+
     }
     
     catch (std::exception &exc)
