@@ -145,7 +145,7 @@ private:
 
     Triangulation<2>                triangulation;                     // triangulation for the solution grid
     FE_Q<2>                         fe;                                // fe for the solution grid
-    DoFHandler<2>                    dof_handler;                       // dof handler for the solution grid
+    DoFHandler<2>                   dof_handler;                       // dof handler for the solution grid
 
     Triangulation<2>                triangulation_adaptiveIntegration;   // triangulation for the integration grid
     FE_Q<2>                         fe_adaptiveIntegration;              // fe for the integration grid
@@ -256,7 +256,7 @@ void Step3::assemble_system ()
         right_hand_side.value_list (fe_values.get_quadrature_points(),
                                     rhs_values);
 
-//        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
+        //        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
 
         // get values of indicator function (alpha)
         std::vector<double> indicator_function_values(collected_quadrature.size());
@@ -333,15 +333,15 @@ void Step3::assemble_system ()
                                                 system_matrix,
                                                 system_rhs);
     }
-//    std::ofstream ofs_system_matrix;
-//    ofs_system_matrix.open ("matrix.txt", std::ofstream::out);
-//    system_matrix.print(ofs_system_matrix);
-//    ofs_system_matrix.close();
+    //    std::ofstream ofs_system_matrix;
+    //    ofs_system_matrix.open ("matrix.txt", std::ofstream::out);
+    //    system_matrix.print(ofs_system_matrix);
+    //    ofs_system_matrix.close();
 
-//    std::ofstream ofs_sparsity_pattern;
-//    ofs_sparsity_pattern.open ("sparsity_pattern.txt", std::ofstream::out);
-//    system_matrix.print_pattern(ofs_sparsity_pattern);
-//    ofs_sparsity_pattern.close();
+    //    std::ofstream ofs_sparsity_pattern;
+    //    ofs_sparsity_pattern.open ("sparsity_pattern.txt", std::ofstream::out);
+    //    system_matrix.print_pattern(ofs_sparsity_pattern);
+    //    ofs_sparsity_pattern.close();
 }
 
 double Step3::Nitsche_matrix_terms(const int q_index, const int i, const int j, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment)
@@ -391,17 +391,17 @@ void Step3::print_cond(double cond){
 
 void Step3::solve ()
 {
-//    SparseDirectUMFPACK  A_direct;              // use direct solver
-//    A_direct.initialize(system_matrix);
-//    A_direct.vmult (solution, system_rhs);
+    //    SparseDirectUMFPACK  A_direct;              // use direct solver
+    //    A_direct.initialize(system_matrix);
+    //    A_direct.vmult (solution, system_rhs);
 
-        SolverControl           solver_control (100000, 1e-12);
-        SolverCG<>              solver (solver_control);
+    SolverControl           solver_control (100000, 1e-12);
+    SolverCG<>              solver (solver_control);
 
-        solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
+    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
 
-        solver.solve (system_matrix, solution, system_rhs,
-                      PreconditionIdentity());
+    solver.solve (system_matrix, solution, system_rhs,
+                  PreconditionIdentity());
 }
 
 
@@ -496,27 +496,24 @@ void Step3::process_solution (const unsigned int cycle)
 void Step3::run ()
 {
     setup_grid_and_boundary ();
-
     for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 5; global_refinement_cycles++ )
     {
         std::cout << "Cycle " << global_refinement_cycles << std::endl;
         triangulation.refine_global (1);
         triangulation_adaptiveIntegration.refine_global (1);
         penalty_term = 2.0 * polynomial_degree * (polynomial_degree+1) * (global_refinement_cycles + global_refinement_level);
+        std::cout<<"Update point list..."<<std::endl;
         point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
 
         for (unsigned int i = 0; i < refinement_cycles; i++)
         {
             refine_grid();
+            std::cout<<"Update point list..."<<std::endl;
             point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
-            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), i+1);
+            //            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), i+1);
         }
-
+        std::cout<<"Construct poly..."<<std::endl;
         my_poly.constructPolygon(point_list);                   // construct polygon from list of points
-//        my_poly.list_segments();
-//        my_poly.save_segments();
-//        my_poly.save_q_points();
-
         std::cout<<"Setting up the system..."<<std::endl;
         setup_system ();
         std::cout << "   Number of active cells:       "
@@ -531,43 +528,44 @@ void Step3::run ()
         solve ();
         std::cout<<"Process solution..."<<std::endl;
         process_solution(global_refinement_cycles);
+
     }
 
     std::cout<<"Output results..."<<std::endl;
     output_results ();
 
-    std::cout<<"Construction the convergence table..."<<std::endl;
-    convergence_table.set_precision("L2", 3);
-    convergence_table.set_precision("H1", 3);
-    convergence_table.set_precision("Linfty", 3);
+    //    std::cout<<"Construction the convergence table..."<<std::endl;
+    //    convergence_table.set_precision("L2", 3);
+    //    convergence_table.set_precision("H1", 3);
+    //    convergence_table.set_precision("Linfty", 3);
 
-    convergence_table.set_scientific("L2", true);
-    convergence_table.set_scientific("H1", true);
-    convergence_table.set_scientific("Linfty", true);
+    //    convergence_table.set_scientific("L2", true);
+    //    convergence_table.set_scientific("H1", true);
+    //    convergence_table.set_scientific("Linfty", true);
 
-    std::cout << std::endl;
-    convergence_table.write_text(std::cout);
+    //    std::cout << std::endl;
+    //    convergence_table.write_text(std::cout);
 
-    convergence_table.add_column_to_supercolumn("cycle", "n cells");
-    convergence_table.add_column_to_supercolumn("cells", "n cells");
+    //    convergence_table.add_column_to_supercolumn("cycle", "n cells");
+    //    convergence_table.add_column_to_supercolumn("cells", "n cells");
 
-    std::vector<std::string> new_order;
-    new_order.push_back("n cells");
-    new_order.push_back("H1");
-    new_order.push_back("L2");
-    convergence_table.set_column_order (new_order);
+    //    std::vector<std::string> new_order;
+    //    new_order.push_back("n cells");
+    //    new_order.push_back("H1");
+    //    new_order.push_back("L2");
+    //    convergence_table.set_column_order (new_order);
 
-    convergence_table
-            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate);
-    convergence_table
-            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate_log2);
-    convergence_table
-            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate);
-    convergence_table
-            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate_log2);
+    //    convergence_table
+    //            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate);
+    //    convergence_table
+    //            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate_log2);
+    //    convergence_table
+    //            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate);
+    //    convergence_table
+    //            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate_log2);
 
-    std::cout << std::endl;
-    convergence_table.write_text(std::cout);
+    //    std::cout << std::endl;
+    //    convergence_table.write_text(std::cout);
 }
 }
 

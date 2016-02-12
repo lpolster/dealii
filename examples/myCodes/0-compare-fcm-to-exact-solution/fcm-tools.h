@@ -114,7 +114,7 @@ bool contains_boundary (const typename dealii::DoFHandler<2>::cell_iterator cell
         return true;
 }
 //_____________________________________________
-std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point<2>> point_list, const typename dealii::Triangulation<2> &triangulation)
+std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point<2>> &point_list, const typename dealii::Triangulation<2> &triangulation)
 {
 
     std::vector<dealii::Point<2>> updated_point_list;
