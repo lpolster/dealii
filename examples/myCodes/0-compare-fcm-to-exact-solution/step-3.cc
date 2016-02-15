@@ -45,6 +45,7 @@
 namespace FCMImplementation{ // use namespace to avoid the problems that result if names of different functions or variables collide
 using namespace dealii;
 
+int dim = 2;
 
 class SolutionBase
 {
@@ -53,26 +54,25 @@ protected:
     const double       width = 0.25;
 };
 
-class Solution : public Function<2>, protected SolutionBase
+template <int dim>
+class Solution : public Function<dim>,
+        protected SolutionBase
 {
 public:
-    Solution () : Function<2>() {}
-
-    virtual double value (const Point<2>   &p,
+    Solution () : Function<dim>() {}
+    virtual double value (const Point<dim>   &p,
                           const unsigned int  component = 0) const;
-
-    virtual Tensor<1,2> gradient (const Point<2>   &p,
-                                  const unsigned int  component = 0) const;
-
+    virtual Tensor<1,dim> gradient (const Point<dim>   &p,
+                                    const unsigned int  component = 0) const;
 };
 
-
-double Solution::value (const Point<2>   &p,
-                        const unsigned int) const
+template <int dim>
+double Solution<dim>::value (const Point<dim>   &p,
+                             const unsigned int) const
 {
     double return_value = 0;
 
-    const Tensor<1,2> x_minus_xi = p - source_center;
+    const Tensor<1,dim> x_minus_xi = p - source_center;
 
     return_value = std::exp(-x_minus_xi.norm_square() /
                             (width * width));
@@ -80,12 +80,13 @@ double Solution::value (const Point<2>   &p,
     return return_value;
 }
 
-Tensor<1,2> Solution::gradient (const Point<2>   &p,
-                                const unsigned int) const
+template <int dim>
+Tensor<1,dim> Solution<dim>::gradient (const Point<dim>   &p,
+                                       const unsigned int) const
 {
-    Tensor<1,2> return_value;
+    Tensor<1,dim> return_value;
 
-    const Tensor<1,2> x_minus_xi = p - source_center;
+    const Tensor<1,dim> x_minus_xi = p - source_center;
 
     return_value = (-2 / (width * width) *
                     std::exp(-x_minus_xi.norm_square() /
@@ -96,23 +97,24 @@ Tensor<1,2> Solution::gradient (const Point<2>   &p,
 }
 
 
-class RightHandSide : public Function<2>,
+template <int dim>
+class RightHandSide : public Function<dim>,
         protected SolutionBase
 {
 public:
-    RightHandSide () : Function<2>() {}
+    RightHandSide () : Function<dim>() {}
 
-    virtual double value (const Point<2>   &p,
+    virtual double value (const Point<dim>   &p,
                           const unsigned int  component = 0) const;
 };
 
-
-double RightHandSide::value (const Point<2>   &p,
-                             const unsigned int) const
+template <int dim>
+double RightHandSide<dim>::value (const Point<dim> &p,
+                                  const unsigned int) const
 {
     double return_value = 0;
 
-    const Tensor<1,2> x_minus_xi = p - source_center;
+    const Tensor<1,dim> x_minus_xi = p - source_center;
 
     // The Laplacian:
     return_value = ((2*2 - 4*x_minus_xi.norm_square()/
@@ -141,6 +143,8 @@ private:
     void solve ();
     void output_results () const;
     void refine_grid();
+    void coarsen_grid(int global_refinement_level);
+
     void process_solution(const unsigned int cycle);
 
     Triangulation<2>                triangulation;                     // triangulation for the solution grid
@@ -167,7 +171,7 @@ private:
     double penalty_term;
 
     double Nitsche_matrix_terms(const int q_index, const int i, const int j, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment);
-    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution exact_solution);
+    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution);
     void print_cond(double cond);
 
 };
@@ -232,8 +236,8 @@ void Step3::assemble_system ()
 
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);    // the cell matrix
     Vector<double>       cell_rhs (dofs_per_cell);                      // the cell right hand side
-    const RightHandSide  right_hand_side;
-    const Solution       exact_solution;
+    const RightHandSide<2>  right_hand_side;
+    const Solution<2>       exact_solution;
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
@@ -368,7 +372,7 @@ double Step3::Nitsche_matrix_terms(const int q_index, const int i, const int j, 
     return Nitsche_matrix_terms;
 }
 
-double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution exact_solution)
+double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution)
 {
     double Nitsche_rhs_terms = 0.0;
 
@@ -451,13 +455,32 @@ void Step3::refine_grid ()
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
 }
 
+void Step3::coarsen_grid (int global_refinement_level)
+{
+    // Create a vector of floats that contains information about whether the cell contains the boundary or not
+    myPolygon  my_poly;
+    my_poly.constructPolygon(point_list);
+    typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
+            cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
+            endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
+    typename DoFHandler<2>::active_cell_iterator previous_cell  = dof_handler_adaptiveIntegration.begin_active();
+
+    for (; cell!=endc; ++cell) // loop over all active cells
+    {
+        if (cell->level() > global_refinement_level)
+            cell -> set_coarsen_flag();
+    }
+
+    triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
+}
+
 void Step3::process_solution (const unsigned int cycle)
 {
 
     Vector<float> difference_per_cell (triangulation.n_active_cells());
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       Solution(),
+                                       Solution<2>(),
                                        difference_per_cell,
                                        QGauss<2>(3),
                                        VectorTools::L2_norm);
@@ -465,7 +488,7 @@ void Step3::process_solution (const unsigned int cycle)
 
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       Solution(),
+                                       Solution<2>(),
                                        difference_per_cell,
                                        QGauss<2>(3),
                                        VectorTools::H1_seminorm);
@@ -475,7 +498,7 @@ void Step3::process_solution (const unsigned int cycle)
     const QIterated<2> q_iterated (q_trapez, 5);
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       Solution(),
+                                       Solution<2>(),
                                        difference_per_cell,
                                        q_iterated,
                                        VectorTools::Linfty_norm);
@@ -496,7 +519,7 @@ void Step3::process_solution (const unsigned int cycle)
 void Step3::run ()
 {
     setup_grid_and_boundary ();
-    for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 5; global_refinement_cycles++ )
+    for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 7; global_refinement_cycles++ )
     {
         std::cout << "Cycle " << global_refinement_cycles << std::endl;
         triangulation.refine_global (1);
@@ -505,12 +528,14 @@ void Step3::run ()
         std::cout<<"Update point list..."<<std::endl;
         point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
 
+        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), 0);
+
         for (unsigned int i = 0; i < refinement_cycles; i++)
         {
             refine_grid();
             std::cout<<"Update point list..."<<std::endl;
             point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
-            //            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), i+1);
+            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), i+1);
         }
         std::cout<<"Construct poly..."<<std::endl;
         my_poly.constructPolygon(point_list);                   // construct polygon from list of points
@@ -529,43 +554,48 @@ void Step3::run ()
         std::cout<<"Process solution..."<<std::endl;
         process_solution(global_refinement_cycles);
 
+        for (unsigned int i = 0; i < refinement_cycles; i++)
+        {
+            coarsen_grid(global_refinement_cycles+global_refinement_level);
+            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid_coarsened", (global_refinement_cycles+global_refinement_level), i+1);
+        }
     }
 
     std::cout<<"Output results..."<<std::endl;
     output_results ();
 
-    //    std::cout<<"Construction the convergence table..."<<std::endl;
-    //    convergence_table.set_precision("L2", 3);
-    //    convergence_table.set_precision("H1", 3);
-    //    convergence_table.set_precision("Linfty", 3);
+    std::cout<<"Constructing the convergence table..."<<std::endl;
+    convergence_table.set_precision("L2", 3);
+    convergence_table.set_precision("H1", 3);
+    convergence_table.set_precision("Linfty", 3);
 
-    //    convergence_table.set_scientific("L2", true);
-    //    convergence_table.set_scientific("H1", true);
-    //    convergence_table.set_scientific("Linfty", true);
+    convergence_table.set_scientific("L2", true);
+    convergence_table.set_scientific("H1", true);
+    convergence_table.set_scientific("Linfty", true);
 
-    //    std::cout << std::endl;
-    //    convergence_table.write_text(std::cout);
+    std::cout << std::endl;
+    convergence_table.write_text(std::cout);
 
-    //    convergence_table.add_column_to_supercolumn("cycle", "n cells");
-    //    convergence_table.add_column_to_supercolumn("cells", "n cells");
+    convergence_table.add_column_to_supercolumn("cycle", "n cells");
+    convergence_table.add_column_to_supercolumn("cells", "n cells");
 
-    //    std::vector<std::string> new_order;
-    //    new_order.push_back("n cells");
-    //    new_order.push_back("H1");
-    //    new_order.push_back("L2");
-    //    convergence_table.set_column_order (new_order);
+    std::vector<std::string> new_order;
+    new_order.push_back("n cells");
+    new_order.push_back("H1");
+    new_order.push_back("L2");
+    convergence_table.set_column_order (new_order);
 
-    //    convergence_table
-    //            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate);
-    //    convergence_table
-    //            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate_log2);
-    //    convergence_table
-    //            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate);
-    //    convergence_table
-    //            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate_log2);
+    convergence_table
+            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate);
+    convergence_table
+            .evaluate_convergence_rates("L2", ConvergenceTable::reduction_rate_log2);
+    convergence_table
+            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate);
+    convergence_table
+            .evaluate_convergence_rates("H1", ConvergenceTable::reduction_rate_log2);
 
-    //    std::cout << std::endl;
-    //    convergence_table.write_text(std::cout);
+    std::cout << std::endl;
+    convergence_table.write_text(std::cout);
 }
 }
 
@@ -580,10 +610,8 @@ int main ()
         std::remove("indicator_function_values");
         std::remove("collected_quadrature");
         
-        
         Step3 laplace_problem;
         laplace_problem.run ();
-
     }
     
     catch (std::exception &exc)
