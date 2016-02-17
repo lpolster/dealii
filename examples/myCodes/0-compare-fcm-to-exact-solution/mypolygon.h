@@ -11,7 +11,8 @@
 #include <iostream>
 #include <fstream>
 
-dealii::QGauss<1>  boundary_quadrature(2); // quadrature on boundary
+
+dealii::QGauss<1>  boundary_quadrature(polynomial_degree+1); // quadrature on boundary
 
 
 //**********************************
@@ -31,7 +32,7 @@ public:
         double length;
         dealii::Point<2> normalVector;
         std::vector<dealii::Point<2>> q_points;
-        std::vector<double> q_weights = {0.5000, 0.5000};
+        std::vector<double> q_weights;
     };
     std::vector<segment> segment_list;
     
@@ -44,6 +45,7 @@ public:
             my_segment.endPoint = point_list[i+1];
             my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint)); assert(my_segment.length > 0);
             my_segment.q_points = calculate_q_points(my_segment);
+            my_segment.q_weights = calculate_q_weights();
             my_segment.normalVector = calculate_normals(my_segment);
             
             segment_list.push_back(my_segment);
@@ -165,6 +167,16 @@ private:
         }
         
         return q_points;
+    }
+
+    std::vector<double> calculate_q_weights()
+    {
+        std::vector<double> q_weights;  
+        for (unsigned int i = 0; i < boundary_quadrature.size(); ++i)
+        {
+        q_weights.insert(q_weights.end(), 0.500);
+        }
+        return q_weights;
     }
     
     dealii::Point<2> calculate_normals (const segment my_segment) // for polygon defined clockwise

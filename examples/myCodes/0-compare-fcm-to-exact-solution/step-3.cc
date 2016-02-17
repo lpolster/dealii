@@ -37,15 +37,17 @@
 #include <fstream>
 #include <iostream>
 #include <math.h>
+#include "parameters.h"
 #include "mypolygon.h"
 #include "fcm-tools.h"
 #include "find_cells.h"
 
 
+
 namespace FCMImplementation{ // use namespace to avoid the problems that result if names of different functions or variables collide
 using namespace dealii;
 
-int dim = 2;
+const int dim = 2;
 
 class SolutionBase
 {
@@ -170,7 +172,6 @@ private:
 
     double penalty_term;
 
-    double Nitsche_matrix_terms(const int q_index, const int i, const int j, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment);
     double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution);
     void print_cond(double cond);
 
@@ -180,7 +181,7 @@ Step3::Step3 ()
     :
       fe (polynomial_degree),                                      // bilinear
       dof_handler (triangulation),
-      fe_adaptiveIntegration (1),                                 // bilinear
+      fe_adaptiveIntegration (polynomial_degree),                                 // bilinear
       dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
 {}
 
@@ -239,6 +240,19 @@ void Step3::assemble_system ()
     const RightHandSide<2>  right_hand_side;
     const Solution<2>       exact_solution;
 
+    double          indicator_function_value_q_index;
+    double          fe_values_JxW_q_index;
+    Tensor<1,dim>   fe_values_shape_grad_i_q_index;
+    double          fe_value_shape_value_i_q_index;
+    double          rhs_value_q_index;
+    double          cell_matrix_temp;
+    double          cell_rhs_temp;
+
+    double          segment_length;
+    double          fe_values_on_boundary_segment_weight;
+    double          fe_values_on_boundary_segment_shape_value_i_q_index;
+    dealii::Point<2> normal_vector;
+
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
     DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
@@ -271,22 +285,26 @@ void Step3::assemble_system ()
 
         for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index) // loop over all quadrature points in that cell
         {
-            for (unsigned int i=0; i<dofs_per_cell; ++i)
-                for (unsigned int j=0; j<dofs_per_cell; ++j){
-                    cell_matrix(i,j) += (fe_values.shape_grad (i, q_index) *        // assemble cell matrix
-                                         fe_values.shape_grad (j, q_index) *
-                                         indicator_function_values[q_index] *
-                                         fe_values.JxW (q_index));
-                    Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
-                }
+            indicator_function_value_q_index =  indicator_function_values[q_index];
+            fe_values_JxW_q_index = fe_values.JxW (q_index);
+            rhs_value_q_index =   rhs_values [q_index];
+
+            cell_matrix_temp = indicator_function_value_q_index * fe_values_JxW_q_index;
+            cell_rhs_temp = indicator_function_value_q_index * rhs_value_q_index * fe_values_JxW_q_index;
 
             for (unsigned int i=0; i<dofs_per_cell; ++i){
-                cell_rhs(i) += (fe_values.shape_value (i, q_index) *
-                                indicator_function_values[q_index] *                // assemble cell right hand side
-                                rhs_values [q_index] *
-                                fe_values.JxW (q_index));
+                fe_values_shape_grad_i_q_index = fe_values.shape_grad (i, q_index);
+                fe_value_shape_value_i_q_index = fe_values.shape_value (i, q_index);
+
+                cell_rhs(i) += (cell_rhs_temp * fe_value_shape_value_i_q_index);
                 Assert(std::isfinite(cell_rhs(i)), ExcNumberNotFinite(std::complex<double>(cell_rhs(i))));
+
+                for (unsigned int j=0; j<dofs_per_cell; ++j){
+                    cell_matrix(i,j) += (fe_values_shape_grad_i_q_index * fe_values.shape_grad (j, q_index) * cell_matrix_temp);
+                    Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+                }
             }
+
 
             //            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
             //            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
@@ -302,6 +320,8 @@ void Step3::assemble_system ()
             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
                 myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
+                segment_length = my_segment.length;
+                normal_vector =  my_segment.normalVector;
 
                 // Nitsche method
 
@@ -313,10 +333,29 @@ void Step3::assemble_system ()
 
                 for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index)
                 {
+                    fe_values_on_boundary_segment_weight = fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] * segment_length;
+
                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
+
+                        fe_values_on_boundary_segment_shape_value_i_q_index = fe_values_on_boundary_segment.shape_value(i,q_index);
+
                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
 
-                            cell_matrix(i,j) +=  Nitsche_matrix_terms(q_index, i, j, fe_values_on_boundary_segment, my_segment);
+                            cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment_shape_value_i_q_index *
+                                                                    fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                                    fe_values_on_boundary_segment_weight);
+
+                            cell_matrix(i,j) -= (fe_values_on_boundary_segment_shape_value_i_q_index*
+                                                     normal_vector *
+                                                     fe_values_on_boundary_segment.shape_grad(j,q_index) * //fe_values_on_boundary_segment.JxW (q_index));
+                                                     fe_values_on_boundary_segment_weight);
+
+                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                     normal_vector *
+                                                     fe_values_on_boundary_segment.shape_grad(i,q_index) *
+                                                     fe_values_on_boundary_segment_weight);
+
+                            Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
 
                         } // endfor
                         cell_rhs(i) += Nitsche_rhs_terms(q_index, i, fe_values_on_boundary_segment, my_segment, exact_solution);
@@ -348,30 +387,6 @@ void Step3::assemble_system ()
     //    ofs_sparsity_pattern.close();
 }
 
-double Step3::Nitsche_matrix_terms(const int q_index, const int i, const int j, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment)
-{
-    double Nitsche_matrix_terms = 0.0;
-    Nitsche_matrix_terms += penalty_term * (fe_values_on_boundary_segment.shape_value(i,q_index) *
-                                            fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                            my_segment.length *
-                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-
-    Nitsche_matrix_terms -= (fe_values_on_boundary_segment.shape_value(i,q_index) *
-                             my_segment.normalVector *
-                             fe_values_on_boundary_segment.shape_grad(j,q_index) * my_segment.length * //fe_values_on_boundary_segment.JxW (q_index));
-                             fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-
-    Nitsche_matrix_terms -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
-                             my_segment.normalVector *
-                             fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                             my_segment.length*
-                             fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-
-    Assert(std::isfinite(Nitsche_matrix_terms), ExcNumberNotFinite(std::complex<double>(Nitsche_matrix_terms)));
-
-    return Nitsche_matrix_terms;
-}
-
 double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution)
 {
     double Nitsche_rhs_terms = 0.0;
@@ -395,17 +410,17 @@ void Step3::print_cond(double cond){
 
 void Step3::solve ()
 {
-    //    SparseDirectUMFPACK  A_direct;              // use direct solver
-    //    A_direct.initialize(system_matrix);
-    //    A_direct.vmult (solution, system_rhs);
+        SparseDirectUMFPACK  A_direct;              // use direct solver
+        A_direct.initialize(system_matrix);
+        A_direct.vmult (solution, system_rhs);
 
-    SolverControl           solver_control (100000, 1e-12);
-    SolverCG<>              solver (solver_control);
+//    SolverControl           solver_control (100000, 1e-12);
+//    SolverCG<>              solver (solver_control);
 
-    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
+//    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
 
-    solver.solve (system_matrix, solution, system_rhs,
-                  PreconditionIdentity());
+//    solver.solve (system_matrix, solution, system_rhs,
+//                  PreconditionIdentity());
 }
 
 
@@ -463,7 +478,6 @@ void Step3::coarsen_grid (int global_refinement_level)
     typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
             cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
             endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
-    typename DoFHandler<2>::active_cell_iterator previous_cell  = dof_handler_adaptiveIntegration.begin_active();
 
     for (; cell!=endc; ++cell) // loop over all active cells
     {
@@ -482,7 +496,7 @@ void Step3::process_solution (const unsigned int cycle)
                                        solution,
                                        Solution<2>(),
                                        difference_per_cell,
-                                       QGauss<2>(3),
+                                       QGauss<2>(polynomial_degree+2), // explicit no. quadrature points
                                        VectorTools::L2_norm);
     const double L2_error = difference_per_cell.l2_norm();
 
@@ -490,12 +504,12 @@ void Step3::process_solution (const unsigned int cycle)
                                        solution,
                                        Solution<2>(),
                                        difference_per_cell,
-                                       QGauss<2>(3),
+                                       QGauss<2>(polynomial_degree+2), // explicit no. quadrature points
                                        VectorTools::H1_seminorm);
     const double H1_error = difference_per_cell.l2_norm();
 
     const QTrapez<1>     q_trapez;
-    const QIterated<2> q_iterated (q_trapez, 5);
+    const QIterated<2> q_iterated (q_trapez, 5); // explicit no. quadrature points
     VectorTools::integrate_difference (dof_handler,
                                        solution,
                                        Solution<2>(),
@@ -557,7 +571,6 @@ void Step3::run ()
         for (unsigned int i = 0; i < refinement_cycles; i++)
         {
             coarsen_grid(global_refinement_cycles+global_refinement_level);
-            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid_coarsened", (global_refinement_cycles+global_refinement_level), i+1);
         }
     }
 
