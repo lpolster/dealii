@@ -14,15 +14,6 @@
 
 dealii::QGauss<1>  boundary_quadrature(polynomial_degree+1); // quadrature on boundary
 
-
-//**********************************
-//   1 x-----x-----x
-//     |           |
-//   0 x           x
-//     |           |
-//  -1 x-----x-----x
-//     -1    0     1
-
 class myPolygon
 {
 public:
@@ -37,6 +28,7 @@ public:
     std::vector<segment> segment_list;
     
     myPolygon(){ }
+
     void constructPolygon(const std::vector<dealii::Point<2>> point_list){
         for (unsigned int i = 0; i < point_list.size()-1; ++i)
         {
@@ -64,7 +56,7 @@ public:
         return product;
     }
     
-    void list_segments(){
+    void list_segments(){ // plot to console
         std::cout<<"Listing segments: "<<std::endl;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
@@ -87,7 +79,7 @@ public:
         ofs_poly.close();
     }
     
-    bool is_inside(const dealii::Point<2> p1){
+    bool is_inside(const dealii::Point<dim> p1){ // test whether a point is inside the polygon
         segment my_segment = segment_list[0];
         double minimum_distance = calculate_distance(my_segment, p1);
         segment closest_segment = my_segment;
@@ -112,7 +104,7 @@ public:
             return false;
     }
     
-    void save_q_points(){
+    void save_q_points(){ // save quadrature points to txt file
         std::remove("plot_q_points_on_boundary");
         std::ofstream ofs_q_points;
         ofs_q_points.open ("plot_q_points_on_boundary", std::ofstream::out | std::ofstream::app);
@@ -132,7 +124,7 @@ public:
         for (unsigned int i = 0; i <segment_list.size(); ++i)
         {
             segment my_segment = segment_list[i];
-            for (unsigned int j = 0; j <my_segment.q_points .size(); ++j)
+            for (unsigned int j = 0; j <my_segment.q_points.size(); ++j)
                 q_points.insert(q_points.end(), my_segment.q_points[j]);
         }
         return q_points;

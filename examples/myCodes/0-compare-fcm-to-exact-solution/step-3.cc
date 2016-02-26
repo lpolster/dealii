@@ -47,8 +47,6 @@
 namespace FCMImplementation{ // use namespace to avoid the problems that result if names of different functions or variables collide
 using namespace dealii;
 
-const int dim = 2;
-
 class SolutionBase
 {
 protected:
@@ -98,7 +96,6 @@ Tensor<1,dim> Solution<dim>::gradient (const Point<dim>   &p,
     return return_value;
 }
 
-
 template <int dim>
 class RightHandSide : public Function<dim>,
         protected SolutionBase
@@ -124,7 +121,6 @@ double RightHandSide<dim>::value (const Point<dim> &p,
                     (width * width) *
                     std::exp(-x_minus_xi.norm_square() /
                              (width * width)));
-
     return return_value;
 }
 
@@ -136,6 +132,8 @@ public:
     Step3 ();
 
     void run ();
+    myPolygon                       my_poly;                           // the polygon boundary
+
 
 private:
     void make_grid ();
@@ -149,13 +147,13 @@ private:
 
     void process_solution(const unsigned int cycle);
 
-    Triangulation<2>                triangulation;                     // triangulation for the solution grid
-    FE_Q<2>                         fe;                                // fe for the solution grid
-    DoFHandler<2>                   dof_handler;                       // dof handler for the solution grid
+    Triangulation<dim>                triangulation;                     // triangulation for the solution grid
+    FE_Q<dim>                         fe;                                // fe for the solution grid
+    DoFHandler<dim>                   dof_handler;                       // dof handler for the solution grid
 
-    Triangulation<2>                triangulation_adaptiveIntegration;   // triangulation for the integration grid
-    FE_Q<2>                         fe_adaptiveIntegration;              // fe for the integration grid
-    DoFHandler<2>                   dof_handler_adaptiveIntegration;     // dof handler for the integration grid
+    Triangulation<dim>                triangulation_adaptiveIntegration;   // triangulation for the integration grid
+    FE_Q<dim>                         fe_adaptiveIntegration;              // fe for the integration grid
+    DoFHandler<dim>                   dof_handler_adaptiveIntegration;     // dof handler for the integration grid
 
     ConstraintMatrix                constraints;
 
@@ -167,15 +165,39 @@ private:
 
     ConvergenceTable                convergence_table;
 
-    myPolygon                       my_poly;                           // the polygon boundary
     std::vector<dealii::Point<2>>   point_list;
 
     double penalty_term;
 
-    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution);
+    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution);
     void print_cond(double cond);
 
 };
+
+
+// Mask Function //
+template <int dim>
+class MaskFunction : public Function<dim>,
+        public Step3
+{
+public:
+    MaskFunction () : Function<dim>() {}
+    virtual double value (const Point<dim>   &p,
+                          const unsigned int  component = 0) const;
+};
+
+template <int dim>
+double MaskFunction<dim>::value (const Point<dim>   &p,
+                             const unsigned int) const
+{
+    double return_value = 0;
+
+    if (my_poly.is_inside(p))
+        return_value = 1.0;
+
+    return return_value;
+}
+//
 
 Step3::Step3 ()
     :
@@ -191,7 +213,9 @@ void Step3::setup_grid_and_boundary ()
     // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}}; // this is working
     // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
     // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9,0.9}};
-    point_list = {{-0.9,0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
+    point_list = {{-0.9,0.9}, {0.9, 0.3}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
+    //point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
+
 
     //        point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
     GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
@@ -229,16 +253,16 @@ void Step3::setup_system ()
 
 void Step3::assemble_system ()
 {
-    QGauss<2>  quadrature_formula(polynomial_degree+1);
-    Quadrature<2> collected_quadrature;                       // the quadrature rule
-    Quadrature<2> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
+    QGauss<dim>  quadrature_formula(polynomial_degree+1);
+    Quadrature<dim> collected_quadrature;                       // the quadrature rule
+    Quadrature<dim> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
 
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
 
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);    // the cell matrix
     Vector<double>       cell_rhs (dofs_per_cell);                      // the cell right hand side
-    const RightHandSide<2>  right_hand_side;
-    const Solution<2>       exact_solution;
+    const RightHandSide<dim>  right_hand_side;
+    const Solution<dim>       exact_solution;
 
     double          indicator_function_value_q_index;
     double          fe_values_JxW_q_index;
@@ -251,11 +275,11 @@ void Step3::assemble_system ()
     double          segment_length;
     double          fe_values_on_boundary_segment_weight;
     double          fe_values_on_boundary_segment_shape_value_i_q_index;
-    dealii::Point<2> normal_vector;
+    Point<2> normal_vector;
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
-    DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
     for (; cell!=endc; ++cell) // iterate over all cells of solution grid
     {
         cell_matrix = 0;
@@ -265,7 +289,7 @@ void Step3::assemble_system ()
         collected_quadrature = collect_quadratures(topological_equivalent(cell, triangulation_adaptiveIntegration), &quadrature_formula);
 
         // man kann denke ich auch ohne fe values arbeiten...
-        FEValues<2> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
+        FEValues<dim> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
 
         std::vector<double>  rhs_values (collected_quadrature.size());
 
@@ -274,7 +298,7 @@ void Step3::assemble_system ()
         right_hand_side.value_list (fe_values.get_quadrature_points(),
                                     rhs_values);
 
-        //        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
+        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
 
         // get values of indicator function (alpha)
         std::vector<double> indicator_function_values(collected_quadrature.size());
@@ -327,7 +351,7 @@ void Step3::assemble_system ()
 
                 collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
 
-                FEValues<2> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
+                FEValues<dim> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
 
                 fe_values_on_boundary_segment.reinit(cell);
 
@@ -387,7 +411,7 @@ void Step3::assemble_system ()
     //    ofs_sparsity_pattern.close();
 }
 
-double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> exact_solution)
+double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> &exact_solution)
 {
     double Nitsche_rhs_terms = 0.0;
 
@@ -491,32 +515,38 @@ void Step3::coarsen_grid (int global_refinement_level)
 void Step3::process_solution (const unsigned int cycle)
 {
 
+    std::vector<Point<2>> support_points(dof_handler.n_dofs());
+    DoFTools::map_dofs_to_support_points(mapping, dof_handler, support_points);
+
+
+    const MaskFunction<dim> mask; // does not work -> find out why!
+
+
     Vector<float> difference_per_cell (triangulation.n_active_cells());
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       Solution<2>(),
+                                       Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<2>(polynomial_degree+2), // explicit no. quadrature points
-                                       VectorTools::L2_norm);
+                                       QGauss<dim>(polynomial_degree+2), // explicit no. quadrature points
+                                       VectorTools::L2_norm,
+                                       &mask);
     const double L2_error = difference_per_cell.l2_norm();
 
+    DataOut<2> data_out;
+    data_out.attach_dof_handler (dof_handler);
+    data_out.add_data_vector (difference_per_cell, "difference_solution");
+    data_out.build_patches (); // linear interpolation for plotting
+
+    std::ofstream output_gpl ("difference_solution.gpl");
+    data_out.write_gnuplot (output_gpl);
+
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       Solution<2>(),
+                                       Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<2>(polynomial_degree+2), // explicit no. quadrature points
+                                       QGauss<dim>(polynomial_degree+2), // explicit no. quadrature points
                                        VectorTools::H1_seminorm);
     const double H1_error = difference_per_cell.l2_norm();
-
-    const QTrapez<1>     q_trapez;
-    const QIterated<2> q_iterated (q_trapez, 5); // explicit no. quadrature points
-    VectorTools::integrate_difference (dof_handler,
-                                       solution,
-                                       Solution<2>(),
-                                       difference_per_cell,
-                                       q_iterated,
-                                       VectorTools::Linfty_norm);
-    const double Linfty_error = difference_per_cell.linfty_norm();
 
     const unsigned int n_active_cells = triangulation.n_active_cells();
     const unsigned int n_dofs = dof_handler.n_dofs();
@@ -526,14 +556,13 @@ void Step3::process_solution (const unsigned int cycle)
     convergence_table.add_value("dofs", n_dofs);
     convergence_table.add_value("L2", L2_error);
     convergence_table.add_value("H1", H1_error);
-    convergence_table.add_value("Linfty", Linfty_error);
 }
 
 
 void Step3::run ()
 {
     setup_grid_and_boundary ();
-    for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 7; global_refinement_cycles++ )
+    for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 4; global_refinement_cycles++ )
     {
         std::cout << "Cycle " << global_refinement_cycles << std::endl;
         triangulation.refine_global (1);
@@ -574,17 +603,17 @@ void Step3::run ()
         }
     }
 
+    my_poly.save_segments();
+
     std::cout<<"Output results..."<<std::endl;
     output_results ();
 
     std::cout<<"Constructing the convergence table..."<<std::endl;
     convergence_table.set_precision("L2", 3);
     convergence_table.set_precision("H1", 3);
-    convergence_table.set_precision("Linfty", 3);
 
     convergence_table.set_scientific("L2", true);
     convergence_table.set_scientific("H1", true);
-    convergence_table.set_scientific("Linfty", true);
 
     std::cout << std::endl;
     convergence_table.write_text(std::cout);

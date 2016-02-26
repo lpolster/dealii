@@ -1,4 +1,3 @@
-//___________________________________________
 dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2>::cell_iterator cell,
                                           const dealii::Quadrature<2>* base_quadrature)
 {

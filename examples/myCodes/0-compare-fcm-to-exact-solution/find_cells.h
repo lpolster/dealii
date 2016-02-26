@@ -1,3 +1,5 @@
+// from Patrick Esser
+
 #include <deal.II/grid/tria.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/geometry_info.h>
@@ -89,43 +91,4 @@ topological_equivalent(
   get_path(local_child_indices, cell);
   // walk the path in the given triangulation
   return walk_path(local_child_indices, tria);
-}
-
-
-  template <int dim>
-dealii::Quadrature<dim> collect_quadratures(
-    typename dealii::Triangulation<dim>::cell_iterator cell,
-    const dealii::Quadrature<dim>* base_quadrature)
-{
-  if(cell->active())
-  {
-    // not refined, return copy of base quadrature
-    return *base_quadrature;
-  }
-  // get collected quadratures of each children and merge them
-  std::vector<dealii::Point<dim> > q_points;
-  std::vector<double> q_weights;
-  for(unsigned int child = 0;
-      child < dealii::GeometryInfo<dim>::max_children_per_cell;
-      ++child)
-  {
-    // get child
-    typename dealii::Triangulation<dim>::cell_iterator child_cell =
-      cell->child(child);
-    // collect sub-quadratures there
-    dealii::Quadrature<dim> childs_collected_quadratures =
-      collect_quadratures(child_cell, base_quadrature);
-    // project to current cell
-    dealii::Quadrature<dim> child_quadrature =
-      dealii::QProjector<dim>::project_to_child(
-        childs_collected_quadratures, child);
-    // collect resulting quadrature
-    q_points.insert(q_points.end(),
-                    child_quadrature.get_points().begin(),
-                    child_quadrature.get_points().end());
-    q_weights.insert(q_weights.end(),
-                     child_quadrature.get_weights().begin(),
-                     child_quadrature.get_weights().end());
-  }
-  return dealii::Quadrature<dim>(q_points, q_weights);
 }
