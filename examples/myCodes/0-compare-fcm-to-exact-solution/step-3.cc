@@ -1,7 +1,27 @@
-// The finicte cell method on a rectangle. The boundary is given as a polygon (list of vertices clockwise). There is a vertex at least at every cell boundary.
-// Poisson problem. Rhs = 1.0. Homogeneous Dirichlet boundary conditions (0.0).
-// Nitsche Method for boundary condition.
+/* ---------------------------------------------------------------------
+ *
+ * Copyright (C) 2000 - 2015 by the deal.II authors
+ *
+ * This file is part of the deal.II library.
+ *
+ * The deal.II library is free software; you can use it, redistribute
+ * it, and/or modify it under the terms of the GNU Lesser General
+ * Public License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * The full text of the license can be found in the file LICENSE at
+ * the top level of the deal.II distribution.
+ *
+ * ---------------------------------------------------------------------
 
+ *
+ * Author: Wolfgang Bangerth and Ralf Hartmann, University of Heidelberg, 2000
+ */
+
+
+// @sect3{Include files}
+
+// These first include files have all been treated in previous examples, so we
+// won't explain what is in them again.
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -37,213 +57,103 @@
 #include <fstream>
 #include <iostream>
 #include <math.h>
+
 #include "parameters.h"
-#include "mypolygon.h"
-#include "fcm-tools.h"
 #include "find_cells.h"
 
+#include "mypolygon.h"
+#include "fcm-tools.h"
+#include "function_classes.h"
 
 
-namespace FCMImplementation{ // use namespace to avoid the problems that result if names of different functions or variables collide
+#define FCM_DEF
+//#define FEM_DEF
+
+namespace Step7
+{
 using namespace dealii;
 
-class SolutionBase
-{
-protected:
-    const Point<2>   source_center  = {0.0, 0.0};
-    const double       width = 0.25;
-};
-
 template <int dim>
-class Solution : public Function<dim>,
-        protected SolutionBase
+class LaplaceProblem
 {
 public:
-    Solution () : Function<dim>() {}
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
-    virtual Tensor<1,dim> gradient (const Point<dim>   &p,
-                                    const unsigned int  component = 0) const;
-};
-
-template <int dim>
-double Solution<dim>::value (const Point<dim>   &p,
-                             const unsigned int) const
-{
-    double return_value = 0;
-
-    const Tensor<1,dim> x_minus_xi = p - source_center;
-
-    return_value = std::exp(-x_minus_xi.norm_square() /
-                            (width * width));
-
-    return return_value;
-}
-
-template <int dim>
-Tensor<1,dim> Solution<dim>::gradient (const Point<dim>   &p,
-                                       const unsigned int) const
-{
-    Tensor<1,dim> return_value;
-
-    const Tensor<1,dim> x_minus_xi = p - source_center;
-
-    return_value = (-2 / (width * width) *
-                    std::exp(-x_minus_xi.norm_square() /
-                             (width * width)) *
-                    x_minus_xi);
-
-    return return_value;
-}
-
-template <int dim>
-class RightHandSide : public Function<dim>,
-        protected SolutionBase
-{
-public:
-    RightHandSide () : Function<dim>() {}
-
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
-};
-
-template <int dim>
-double RightHandSide<dim>::value (const Point<dim> &p,
-                                  const unsigned int) const
-{
-    double return_value = 0;
-
-    const Tensor<1,dim> x_minus_xi = p - source_center;
-
-    // The Laplacian:
-    return_value = ((2*2 - 4*x_minus_xi.norm_square()/
-                     (width * width)) /
-                    (width * width) *
-                    std::exp(-x_minus_xi.norm_square() /
-                             (width * width)));
-    return return_value;
-}
-
-
-
-class Step3
-{
-public:
-    Step3 ();
+    LaplaceProblem (const FiniteElement<dim> &fe);
+    ~LaplaceProblem ();
 
     void run ();
-    myPolygon                       my_poly;                           // the polygon boundary
-
 
 private:
-    void make_grid ();
     void setup_system ();
-    void setup_grid_and_boundary ();
     void assemble_system ();
     void solve ();
-    void output_results () const;
-    void refine_grid();
-    void coarsen_grid(int global_refinement_level);
+    void refine_grid_globally ();
+    void process_solution (const unsigned int cycle);
+    void output_grid(const dealii::Triangulation<dim>& tria,
+                     std::string name,
+                     const unsigned int nr1);
 
-    void process_solution(const unsigned int cycle);
+    Triangulation<dim>                      triangulation;
+    DoFHandler<dim>                         dof_handler;
 
-    Triangulation<dim>                triangulation;                     // triangulation for the solution grid
-    FE_Q<dim>                         fe;                                // fe for the solution grid
-    DoFHandler<dim>                   dof_handler;                       // dof handler for the solution grid
+    SmartPointer<const FiniteElement<dim> > fe;
 
-    Triangulation<dim>                triangulation_adaptiveIntegration;   // triangulation for the integration grid
-    FE_Q<dim>                         fe_adaptiveIntegration;              // fe for the integration grid
-    DoFHandler<dim>                   dof_handler_adaptiveIntegration;     // dof handler for the integration grid
+    SparsityPattern                         sparsity_pattern;
+    SparseMatrix<double>                    system_matrix;
 
-    ConstraintMatrix                constraints;
+    Vector<double>                          solution;
+    Vector<double>                          system_rhs;
 
-    SparsityPattern                 sparsity_pattern;
-    SparseMatrix<double>            system_matrix;                     // system/stiffness matrix
+    ConvergenceTable                        convergence_table;
 
-    Vector<double>                  solution;                          // solution/coefficent vector
-    Vector<double>                  system_rhs;                        // the right hand side
+#ifdef FCM_DEF
+    void setup_grid_and_boundary ();
+    void refine_grid_adaptively ();
+    void coarsen_grid_adaptively (int global_refinement_level);
+    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<dim> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution);
 
-    ConvergenceTable                convergence_table;
-
-    std::vector<dealii::Point<2>>   point_list;
-
-    double penalty_term;
-
-    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution);
-    void print_cond(double cond);
+    std::vector<dealii::Point<2>>           point_list;
+    Triangulation<dim>                      triangulation_adaptiveIntegration;   // triangulation for the integration grid
+    myPolygon                               my_poly;
+    double                                  penalty_term;
+#endif
 
 };
 
 
-// Mask Function //
 template <int dim>
-class MaskFunction : public Function<dim>,
-        public Step3
-{
-public:
-    MaskFunction () : Function<dim>() {}
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
-};
-
-template <int dim>
-double MaskFunction<dim>::value (const Point<dim>   &p,
-                             const unsigned int) const
-{
-    double return_value = 0;
-
-    if (my_poly.is_inside(p))
-        return_value = 1.0;
-
-    return return_value;
-}
-//
-
-Step3::Step3 ()
-    :
-      fe (polynomial_degree),                                      // bilinear
-      dof_handler (triangulation),
-      fe_adaptiveIntegration (polynomial_degree),                                 // bilinear
-      dof_handler_adaptiveIntegration (triangulation_adaptiveIntegration)
+LaplaceProblem<dim>::LaplaceProblem (const FiniteElement<dim> &fe) :
+    dof_handler (triangulation),
+    fe (&fe)
 {}
 
-
-void Step3::setup_grid_and_boundary ()
+template <int dim>
+LaplaceProblem<dim>::~LaplaceProblem ()
 {
-    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {0.2, 0.2}, {-0.9,0.9}}; // this is working
-    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
-    // point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9,0.9}};
-    point_list = {{-0.9,0.9}, {0.9, 0.3}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
-    //point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
+    dof_handler.clear ();
+}
 
-
-    //        point_list = {{0,0.9}, {0.6, 0.1}, {0, -0.8}, {-0.7,-0.1}, {0,0.9}};
+#ifdef FCM_DEF
+template <int dim>
+void LaplaceProblem<dim>::setup_grid_and_boundary ()
+{
+    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
     GridGenerator::hyper_cube (triangulation, -1, 1);       // generate triangulation for solution grid
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, -1, 1); // generate triangulation for integration grid
 
-    for (unsigned int i = 0; i< global_refinement_level; i++)
-    {
-        triangulation.refine_global (1);
-        triangulation_adaptiveIntegration.refine_global (1);
-        point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
-    }
+    triangulation.refine_global (1);
+    triangulation_adaptiveIntegration.refine_global (1);
+    point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
 }
+#endif
 
-void Step3::setup_system ()
+
+template <int dim>
+void LaplaceProblem<dim>::setup_system ()
 {
-    dof_handler.distribute_dofs (fe);
-    dof_handler_adaptiveIntegration.distribute_dofs(fe_adaptiveIntegration);
-
-    constraints.clear ();
-    DoFTools::make_hanging_node_constraints (dof_handler,
-                                             constraints);
-    constraints.close ();
+    dof_handler.distribute_dofs (*fe);
 
     DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
-    DoFTools::make_sparsity_pattern(dof_handler,
-                                    dsp,
-                                    constraints,
-                                    /*keep_constrained_dofs = */ true);
+    DoFTools::make_sparsity_pattern(dof_handler, dsp);
     sparsity_pattern.copy_from (dsp);
 
     system_matrix.reinit (sparsity_pattern);
@@ -251,167 +161,193 @@ void Step3::setup_system ()
     system_rhs.reinit (dof_handler.n_dofs());
 }
 
-void Step3::assemble_system ()
+
+template <int dim>
+void LaplaceProblem<dim>::assemble_system ()
 {
-    QGauss<dim>  quadrature_formula(polynomial_degree+1);
-    Quadrature<dim> collected_quadrature;                       // the quadrature rule
-    Quadrature<dim> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
+    QGauss<dim>   quadrature_formula(polynomial_degree+1);
 
-    const unsigned int   dofs_per_cell = fe.dofs_per_cell;
+#ifdef FCM_DEF
+        my_poly.constructPolygon(point_list);                   // construct polygon from list of points
+        my_poly.save_segments();
+        Quadrature<dim> collected_quadrature;                       // the quadrature rule
 
-    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);    // the cell matrix
-    Vector<double>       cell_rhs (dofs_per_cell);                      // the cell right hand side
-    const RightHandSide<dim>  right_hand_side;
-    const Solution<dim>       exact_solution;
+        std::remove("FCM_quadrature");
+        std::remove("indicator_function_values");
 
-    double          indicator_function_value_q_index;
-    double          fe_values_JxW_q_index;
-    Tensor<1,dim>   fe_values_shape_grad_i_q_index;
-    double          fe_value_shape_value_i_q_index;
-    double          rhs_value_q_index;
-    double          cell_matrix_temp;
-    double          cell_rhs_temp;
+#endif
 
-    double          segment_length;
-    double          fe_values_on_boundary_segment_weight;
-    double          fe_values_on_boundary_segment_shape_value_i_q_index;
-    Point<2> normal_vector;
+
+    const unsigned int n_q_points    = quadrature_formula.size();
+    const unsigned int dofs_per_cell = fe->dofs_per_cell;
+
+    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
+    Vector<double>       cell_rhs (dofs_per_cell);
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
-    DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
-    for (; cell!=endc; ++cell) // iterate over all cells of solution grid
+    const RightHandSide<dim> right_hand_side;
+    const Solution<dim> exact_solution;
+
+
+#ifdef FEM_DEF
+    FEValues<dim>  fe_values (*fe, quadrature_formula,
+                              update_values   | update_gradients |
+                              update_quadrature_points | update_JxW_values);
+    std::vector<double>  rhs_values (n_q_points);
+    std::remove("FEM_quadrature");
+#endif
+
+
+    typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    for (; cell!=endc; ++cell)
     {
         cell_matrix = 0;
         cell_rhs = 0;
 
-        // collect quadrature on the cell in solution grid
-        collected_quadrature = collect_quadratures(topological_equivalent(cell, triangulation_adaptiveIntegration), &quadrature_formula);
+#ifdef FCM_DEF
+          collected_quadrature = collect_quadratures(topological_equivalent(cell, triangulation_adaptiveIntegration), &quadrature_formula);
+          FEValues<dim> fe_values(*fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
+          std::vector<double>  rhs_values (collected_quadrature.size());
+#endif
 
-        // man kann denke ich auch ohne fe values arbeiten...
-        FEValues<dim> fe_values(fe, collected_quadrature, update_quadrature_points |  update_gradients | update_JxW_values |  update_values);
+        fe_values.reinit (cell);
 
-        std::vector<double>  rhs_values (collected_quadrature.size());
-
-
-        fe_values.reinit(cell);                        // reinitialize fe values on current cells
         right_hand_side.value_list (fe_values.get_quadrature_points(),
                                     rhs_values);
 
-        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "collected_quadrature");
+#ifdef FCM_DEF
+        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "FCM_quadrature");
 
-        // get values of indicator function (alpha)
         std::vector<double> indicator_function_values(collected_quadrature.size());
         indicator_function_values = get_indicator_function_values(fe_values.get_quadrature().get_points(), cell, my_poly);
+#endif
 
+#ifdef FEM_DEF
+        plot_in_global_coordinates(fe_values.get_quadrature().get_points(), cell, "FEM_quadrature");
+#endif
 
-        //        double weight_counter = 0.0;
-
-        for (unsigned int q_index=0; q_index<collected_quadrature.size(); ++q_index) // loop over all quadrature points in that cell
-        {
-            indicator_function_value_q_index =  indicator_function_values[q_index];
-            fe_values_JxW_q_index = fe_values.JxW (q_index);
-            rhs_value_q_index =   rhs_values [q_index];
-
-            cell_matrix_temp = indicator_function_value_q_index * fe_values_JxW_q_index;
-            cell_rhs_temp = indicator_function_value_q_index * rhs_value_q_index * fe_values_JxW_q_index;
-
-            for (unsigned int i=0; i<dofs_per_cell; ++i){
-                fe_values_shape_grad_i_q_index = fe_values.shape_grad (i, q_index);
-                fe_value_shape_value_i_q_index = fe_values.shape_value (i, q_index);
-
-                cell_rhs(i) += (cell_rhs_temp * fe_value_shape_value_i_q_index);
-                Assert(std::isfinite(cell_rhs(i)), ExcNumberNotFinite(std::complex<double>(cell_rhs(i))));
-
+        // Assemble the cell matrix //
+        for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
+            for (unsigned int i=0; i<dofs_per_cell; ++i)
+            {
                 for (unsigned int j=0; j<dofs_per_cell; ++j){
-                    cell_matrix(i,j) += (fe_values_shape_grad_i_q_index * fe_values.shape_grad (j, q_index) * cell_matrix_temp);
-                    Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+                    double temp_matrix_entry = (fe_values.shape_grad(i,q_point) *
+                                                fe_values.shape_grad(j,q_point) *
+                                                fe_values.JxW(q_point));
+#ifdef FCM_DEF
+                            temp_matrix_entry *= indicator_function_values[q_point];
+#endif
+                    cell_matrix(i,j) += temp_matrix_entry;
                 }
-            }
 
+                double temp_rhs_entry = (fe_values.shape_value(i,q_point) *
+                                         rhs_values [q_point] *
+                                         fe_values.JxW(q_point));
+#ifdef FCM_DEF
+                            temp_rhs_entry *= indicator_function_values[q_point];
+#endif
 
-            //            weight_counter += fe_values.get_quadrature().get_weights()[q_index];
-            //            std::cout<<"weight = "<<fe_values.get_quadrature().get_weights()[q_index]<<std::endl;
-        }
+                cell_rhs(i) += temp_rhs_entry;
+            } //endfor
 
-        // Assertion for sum of weihts in cell (= 0.0)
-        //        std::cout<<"Sum of weights in cell: "<<weight_counter<<std::endl;
+        // Nitsche boundary conditions
 
-        if (contains_boundary(cell, my_poly))
-        {
-            std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
+#ifdef FCM_DEF
+        Point<dim>      normal_vector;
+        double          segment_length;
+        double          fe_values_on_boundary_segment_weight;
+        double          fe_values_on_boundary_segment_shape_value_i_q_index;
+        Quadrature<dim> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
 
-            for (unsigned int k = 0; k < segment_indices.size(); ++ k){
+         if (contains_boundary(cell, my_poly))
+         {
+             {
+             std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
 
-                myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
-                segment_length = my_segment.length;
-                normal_vector =  my_segment.normalVector;
+             for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
-                // Nitsche method
+                 myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
+                 segment_length = my_segment.length;
+                 normal_vector =  my_segment.normalVector;
 
-                collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
+                 collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
 
-                FEValues<dim> fe_values_on_boundary_segment (fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
+                 FEValues<dim> fe_values_on_boundary_segment (*fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
 
-                fe_values_on_boundary_segment.reinit(cell);
+                 fe_values_on_boundary_segment.reinit(cell);
 
-                for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index)
-                {
-                    fe_values_on_boundary_segment_weight = fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] * segment_length;
+                 for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index)
+                 {
+                     fe_values_on_boundary_segment_weight = fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] * segment_length;
 
-                    for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
+                     for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
 
-                        fe_values_on_boundary_segment_shape_value_i_q_index = fe_values_on_boundary_segment.shape_value(i,q_index);
+                         fe_values_on_boundary_segment_shape_value_i_q_index = fe_values_on_boundary_segment.shape_value(i,q_index);
 
-                        for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
+                         for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
 
-                            cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment_shape_value_i_q_index *
-                                                                    fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                                    fe_values_on_boundary_segment_weight);
+                             cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment_shape_value_i_q_index *
+                                                                     fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                                     fe_values_on_boundary_segment_weight);
 
-                            cell_matrix(i,j) -= (fe_values_on_boundary_segment_shape_value_i_q_index*
-                                                     normal_vector *
-                                                     fe_values_on_boundary_segment.shape_grad(j,q_index) * //fe_values_on_boundary_segment.JxW (q_index));
-                                                     fe_values_on_boundary_segment_weight);
+                             cell_matrix(i,j) -= (fe_values_on_boundary_segment_shape_value_i_q_index*
+                                                      normal_vector *
+                                                      fe_values_on_boundary_segment.shape_grad(j,q_index) * //fe_values_on_boundary_segment.JxW (q_index));
+                                                      fe_values_on_boundary_segment_weight);
 
-                            cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                     normal_vector *
-                                                     fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                                                     fe_values_on_boundary_segment_weight);
+                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
+                                                      normal_vector *
+                                                      fe_values_on_boundary_segment.shape_grad(i,q_index) *
+                                                      fe_values_on_boundary_segment_weight);
 
-                            Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+                             Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
 
-                        } // endfor
-                        cell_rhs(i) += Nitsche_rhs_terms(q_index, i, fe_values_on_boundary_segment, my_segment, exact_solution);
+                         } // endfor
+                         cell_rhs(i) += Nitsche_rhs_terms(q_index, i, fe_values_on_boundary_segment, my_segment, exact_solution);
 
-                    } // endfor
+                     } // endfor
 
-                } // endfor
-            }
+                 } // endfor
+             }
+             };
+         }
 
-        } // endfor
-
+#endif
 
         cell->get_dof_indices (local_dof_indices);
 
-        constraints.distribute_local_to_global (cell_matrix,
-                                                cell_rhs,
-                                                local_dof_indices,
-                                                system_matrix,
-                                                system_rhs);
-    }
-    //    std::ofstream ofs_system_matrix;
-    //    ofs_system_matrix.open ("matrix.txt", std::ofstream::out);
-    //    system_matrix.print(ofs_system_matrix);
-    //    ofs_system_matrix.close();
 
-    //    std::ofstream ofs_sparsity_pattern;
-    //    ofs_sparsity_pattern.open ("sparsity_pattern.txt", std::ofstream::out);
-    //    system_matrix.print_pattern(ofs_sparsity_pattern);
-    //    ofs_sparsity_pattern.close();
+        for (unsigned int i=0; i<dofs_per_cell; ++i)
+          for (unsigned int j=0; j<dofs_per_cell; ++j)
+            system_matrix.add (local_dof_indices[i],
+                               local_dof_indices[j],
+                               cell_matrix(i,j));
+
+        // And again, we do the same thing for the right hand side vector.
+        for (unsigned int i=0; i<dofs_per_cell; ++i)
+          system_rhs(local_dof_indices[i]) += cell_rhs(i);
+
+    }
+
+
+#ifdef FEM_DEF
+    std::map<types::global_dof_index,double> boundary_values;
+    VectorTools::interpolate_boundary_values (dof_handler,
+                                              0,
+                                              Solution<dim>(),
+                                              boundary_values);
+    MatrixTools::apply_boundary_values (boundary_values,
+                                        system_matrix,
+                                        solution,
+                                        system_rhs);
+#endif
 }
 
-double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<2> &exact_solution)
+#ifdef FCM_DEF
+
+template<int dim>
+double LaplaceProblem<dim>::Nitsche_rhs_terms(const int q_index, const int i, FEValues<dim> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution)
 {
     double Nitsche_rhs_terms = 0.0;
 
@@ -427,61 +363,41 @@ double Step3::Nitsche_rhs_terms(const int q_index, const int i, FEValues<2> &fe_
 
     return Nitsche_rhs_terms;
 }
+#endif
 
-void Step3::print_cond(double cond){
-    std::cout<<"cond="<<cond <<std::endl;
-}
 
-void Step3::solve ()
+template <int dim>
+void LaplaceProblem<dim>::solve ()
 {
-        SparseDirectUMFPACK  A_direct;              // use direct solver
-        A_direct.initialize(system_matrix);
-        A_direct.vmult (solution, system_rhs);
-
-//    SolverControl           solver_control (100000, 1e-12);
-//    SolverCG<>              solver (solver_control);
-
-//    solver.connect_condition_number_slot(std_cxx11::bind(&Step3::print_cond,this,std_cxx11::_1));
-
-//    solver.solve (system_matrix, solution, system_rhs,
-//                  PreconditionIdentity());
+    SparseDirectUMFPACK  A_direct;              // use direct solver
+    A_direct.initialize(system_matrix);
+    A_direct.vmult (solution, system_rhs);
 }
 
 
-void Step3::output_results () const
+
+template <int dim>
+void LaplaceProblem<dim>::refine_grid_globally ()
 {
-    DataOut<2> data_out;
-    data_out.attach_dof_handler (dof_handler);
-    data_out.add_data_vector (solution, "solution");
-    data_out.build_patches (); // linear interpolation for plotting
+#ifdef FCM_DEF
+        triangulation_adaptiveIntegration.refine_global(1);
+        point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
+#endif
 
-    std::ofstream output_gpl ("solution.gpl");
-    data_out.write_gnuplot (output_gpl);
+    triangulation.refine_global (1);
 
-    std::ofstream output_vtk ("solution.vtk");
-    data_out.write_vtk (output_vtk);
 }
 
-
-void output_grid(const dealii::Triangulation<2>& tria,
-                 std::string name,
-                 const unsigned int nr1, const unsigned int nr2)
-{
-    GridOut grid_out;
-    std::stringstream filename;
-    filename << name << "-" << nr1 << "-" << nr2 << ".svg";
-    std::ofstream out(filename.str());
-    grid_out.write_svg(tria, out);
-}
-
-void Step3::refine_grid ()
+#ifdef FCM_DEF
+template <int dim>
+void LaplaceProblem<dim>::refine_grid_adaptively ()
 {
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
     myPolygon  my_poly;
     my_poly.constructPolygon(point_list);
-    typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
-            cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
-            endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
+    typename Triangulation<dim>::active_cell_iterator // an iterator over all active cells
+            cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
+            endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
 
     for (; cell!=endc; ++cell) // loop over all active cells
     {
@@ -492,16 +408,19 @@ void Step3::refine_grid ()
     }
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
+    point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
+
 }
 
-void Step3::coarsen_grid (int global_refinement_level)
+template <int dim>
+void LaplaceProblem<dim>::coarsen_grid_adaptively (int global_refinement_level)
 {
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
     myPolygon  my_poly;
     my_poly.constructPolygon(point_list);
-    typename DoFHandler<2>::active_cell_iterator // an iterator over all active cells
-            cell = dof_handler_adaptiveIntegration.begin_active(), // the first active cell
-            endc = dof_handler_adaptiveIntegration.end(); // one past the last active cell
+    typename Triangulation<dim>::active_cell_iterator // an iterator over all active cells
+            cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
+            endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
 
     for (; cell!=endc; ++cell) // loop over all active cells
     {
@@ -511,115 +430,205 @@ void Step3::coarsen_grid (int global_refinement_level)
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
 }
+#endif
 
-void Step3::process_solution (const unsigned int cycle)
+template <int dim>
+void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
 {
-
-    std::vector<Point<2>> support_points(dof_handler.n_dofs());
-    DoFTools::map_dofs_to_support_points(mapping, dof_handler, support_points);
-
-
-    const MaskFunction<dim> mask; // does not work -> find out why!
-
-
     Vector<float> difference_per_cell (triangulation.n_active_cells());
     VectorTools::integrate_difference (dof_handler,
                                        solution,
                                        Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<dim>(polynomial_degree+2), // explicit no. quadrature points
-                                       VectorTools::L2_norm,
-                                       &mask);
+                                       QGauss<dim>(polynomial_degree+1),
+                                       VectorTools::L2_norm);
     const double L2_error = difference_per_cell.l2_norm();
 
     DataOut<2> data_out;
     data_out.attach_dof_handler (dof_handler);
-    data_out.add_data_vector (difference_per_cell, "difference_solution");
-    data_out.build_patches (); // linear interpolation for plotting
 
-    std::ofstream output_gpl ("difference_solution.gpl");
+#ifdef FEM_DEF
+    data_out.add_data_vector (difference_per_cell, "FEM_difference_solution");
+#endif
+
+#ifdef FCM_DEF
+    data_out.add_data_vector (difference_per_cell, "FCM_difference_solution");
+#endif
+
+    data_out.build_patches (fe->degree); // linear interpolation for plotting
+
+#ifdef FEM_DEF
+    std::ofstream output_gpl ("FEM_difference_solution.gpl");
+#endif
+
+#ifdef FCM_DEF
+    std::ofstream output_gpl ("FCM_difference_solution.gpl");
+#endif
+
     data_out.write_gnuplot (output_gpl);
 
     VectorTools::integrate_difference (dof_handler,
                                        solution,
                                        Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<dim>(polynomial_degree+2), // explicit no. quadrature points
+                                       QGauss<dim>(polynomial_degree+1),
                                        VectorTools::H1_seminorm);
     const double H1_error = difference_per_cell.l2_norm();
 
-    const unsigned int n_active_cells = triangulation.n_active_cells();
-    const unsigned int n_dofs = dof_handler.n_dofs();
+
+    const QTrapez<1>     q_trapez;
+    const QIterated<dim> q_iterated (q_trapez, 5);
+    VectorTools::integrate_difference (dof_handler,
+                                       solution,
+                                       Solution<dim>(),
+                                       difference_per_cell,
+                                       q_iterated,
+                                       VectorTools::Linfty_norm);
+    const double Linfty_error = difference_per_cell.linfty_norm();
+
+    const unsigned int n_active_cells=triangulation.n_active_cells();
+    const unsigned int n_dofs=dof_handler.n_dofs();
+
+    std::cout << "Cycle " << cycle << ':'
+              << std::endl
+              << "   Number of active cells:       "
+              << n_active_cells
+              << std::endl
+              << "   Number of degrees of freedom: "
+              << n_dofs
+              << std::endl;
 
     convergence_table.add_value("cycle", cycle);
     convergence_table.add_value("cells", n_active_cells);
     convergence_table.add_value("dofs", n_dofs);
     convergence_table.add_value("L2", L2_error);
     convergence_table.add_value("H1", H1_error);
+    convergence_table.add_value("Linfty", Linfty_error);
+}
+
+template <int dim>
+void LaplaceProblem<dim>::output_grid(const dealii::Triangulation<dim>& tria,
+                 std::string name,
+                 const unsigned int nr1)
+{
+    GridOut grid_out;
+    std::stringstream filename;
+    filename << name << "-" << nr1 << ".svg";
+    std::ofstream out(filename.str());
+    grid_out.write_svg(tria, out);
 }
 
 
-void Step3::run ()
+template <int dim>
+void LaplaceProblem<dim>::run ()
 {
-    setup_grid_and_boundary ();
-    for (unsigned int global_refinement_cycles = 1; global_refinement_cycles < 4; global_refinement_cycles++ )
+    const unsigned int n_cycles = 6;
+    for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
     {
-        std::cout << "Cycle " << global_refinement_cycles << std::endl;
-        triangulation.refine_global (1);
-        triangulation_adaptiveIntegration.refine_global (1);
-        penalty_term = 2.0 * polynomial_degree * (polynomial_degree+1) * (global_refinement_cycles + global_refinement_level);
-        std::cout<<"Update point list..."<<std::endl;
-        point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
-
-        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), 0);
-
-        for (unsigned int i = 0; i < refinement_cycles; i++)
+        if (cycle == 0)
         {
-            refine_grid();
-            std::cout<<"Update point list..."<<std::endl;
-            point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
-            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", (global_refinement_cycles+global_refinement_level), i+1);
+#ifdef FCM_DEF
+                setup_grid_and_boundary();
+#endif
+
+#ifdef FEM_DEF
+                    GridGenerator::hyper_cube (triangulation, -1, 1);
+                    triangulation.refine_global (1);
+#endif
+
+
         }
-        std::cout<<"Construct poly..."<<std::endl;
-        my_poly.constructPolygon(point_list);                   // construct polygon from list of points
-        std::cout<<"Setting up the system..."<<std::endl;
+        else
+            refine_grid_globally ();
+
+#ifdef FCM_DEF
+        penalty_term = polynomial_degree * (polynomial_degree+1) * (cycle+1); // 1/h may need to be calculated differently if not -1 to 1
+
+        std::cout<<"Penalty parameter: "<<penalty_term<<std::endl;
+        output_grid(triangulation_adaptiveIntegration, "globalGrid", cycle+1);
+
+        refine_grid_adaptively();
+        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-1", cycle+1);
+
+        refine_grid_adaptively();
+        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-2", cycle+1);
+
+
+        refine_grid_adaptively();
+        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-3", cycle+1);
+
+#endif
+
         setup_system ();
-        std::cout << "   Number of active cells:       "
-                  << triangulation.n_active_cells()
-                  << std::endl
-                  << "   Number of degrees of freedom: "
-                  << dof_handler.n_dofs()
-                  << std::endl;
-        std::cout<<"Assembling the system..."<<std::endl;
-        assemble_system ();
-        std::cout<<"Solving..."<<std::endl;
-        solve ();
-        std::cout<<"Process solution..."<<std::endl;
-        process_solution(global_refinement_cycles);
 
-        for (unsigned int i = 0; i < refinement_cycles; i++)
-        {
-            coarsen_grid(global_refinement_cycles+global_refinement_level);
-        }
+        assemble_system ();
+        solve ();
+
+        DataOut<dim> data_out;
+        data_out.attach_dof_handler (dof_handler);
+        data_out.add_data_vector (solution, "solution");
+        data_out.build_patches (fe->degree); // linear interpolation for plotting
+
+        std::ofstream output_gpl ("solution.gpl");
+        data_out.write_gnuplot (output_gpl);
+
+        process_solution (cycle);
+
+#ifdef FCM_DEF
+        coarsen_grid_adaptively(1+cycle);
+        coarsen_grid_adaptively(1+cycle);
+        coarsen_grid_adaptively(1+cycle);
+#endif
     }
 
-    my_poly.save_segments();
+    std::string vtk_filename;
 
-    std::cout<<"Output results..."<<std::endl;
-    output_results ();
+    vtk_filename = "solution-global";
 
-    std::cout<<"Constructing the convergence table..."<<std::endl;
+    vtk_filename += ".vtk";
+    std::ofstream output (vtk_filename.c_str());
+
+    DataOut<dim> data_out;
+    data_out.attach_dof_handler (dof_handler);
+    data_out.add_data_vector (solution, "solution");
+
+
+    data_out.build_patches (fe->degree);
+    data_out.write_vtk (output);
+
     convergence_table.set_precision("L2", 3);
     convergence_table.set_precision("H1", 3);
+    convergence_table.set_precision("Linfty", 3);
 
     convergence_table.set_scientific("L2", true);
     convergence_table.set_scientific("H1", true);
+    convergence_table.set_scientific("Linfty", true);
+
+    convergence_table.set_tex_caption("cells", "\\# cells");
+    convergence_table.set_tex_caption("dofs", "\\# dofs");
+    convergence_table.set_tex_caption("L2", "$L^2$-error");
+    convergence_table.set_tex_caption("H1", "$H^1$-error");
+    convergence_table.set_tex_caption("Linfty", "$L^\\infty$-error");
+
+    convergence_table.set_tex_format("cells", "r");
+    convergence_table.set_tex_format("dofs", "r");
 
     std::cout << std::endl;
     convergence_table.write_text(std::cout);
 
+    std::string error_filename = "error";
+
+    error_filename += "-global";
+
+    error_filename += ".tex";
+    std::ofstream error_table_file(error_filename.c_str());
+
+    convergence_table.write_tex(error_table_file);
+
+
     convergence_table.add_column_to_supercolumn("cycle", "n cells");
     convergence_table.add_column_to_supercolumn("cells", "n cells");
+
 
     std::vector<std::string> new_order;
     new_order.push_back("n cells");
@@ -638,24 +647,40 @@ void Step3::run ()
 
     std::cout << std::endl;
     convergence_table.write_text(std::cout);
+
+    std::string conv_filename = "convergence";
+
+    conv_filename += "-global";
+
+    std::ofstream table_file(conv_filename.c_str());
+    convergence_table.write_tex(table_file);
+
 }
 }
 
 
 int main ()
 {
+    const unsigned int dim = 2;
+
     try
     {
         using namespace dealii;
-        using namespace FCMImplementation;
-        
-        std::remove("indicator_function_values");
-        std::remove("collected_quadrature");
-        
-        Step3 laplace_problem;
-        laplace_problem.run ();
+        using namespace Step7;
+
+        deallog.depth_console (0);
+
+        {
+            FE_Q<dim> fe(polynomial_degree);
+            LaplaceProblem<dim> helmholtz_problem_2d (fe);
+
+            helmholtz_problem_2d.run ();
+
+            std::cout << std::endl;
+        }
+
+
     }
-    
     catch (std::exception &exc)
     {
         std::cerr << std::endl << std::endl
@@ -679,6 +704,6 @@ int main ()
                   << std::endl;
         return 1;
     }
-    
+
     return 0;
 }

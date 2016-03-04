@@ -47,7 +47,7 @@ public:
         }
     }
     
-    double scalar_product(const dealii::Point<2> a, const dealii::Point<2> b)
+    double scalar_product(const dealii::Point<2> a, const dealii::Point<2> b) const
     {
         double product = 0;
         for (unsigned int i = 0; i < 2; i++)
@@ -56,7 +56,8 @@ public:
         return product;
     }
     
-    void list_segments(){ // plot to console
+    void list_segments() const // plot to console
+    { 
         std::cout<<"Listing segments: "<<std::endl;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
         {
@@ -65,7 +66,8 @@ public:
         }
     }
     
-    void save_segments(){ // save to text file for plotting
+    void save_segments() const // save to text file for plotting
+    {
         std::remove("plot_poly");
         std::ofstream ofs_poly;
         ofs_poly.open ("plot_poly", std::ofstream::out | std::ofstream::app);
@@ -79,7 +81,8 @@ public:
         ofs_poly.close();
     }
     
-    bool is_inside(const dealii::Point<dim> p1){ // test whether a point is inside the polygon
+    bool is_inside(const dealii::Point<dim> p1) const // test whether a point is inside the polygon
+   { 
         segment my_segment = segment_list[0];
         double minimum_distance = calculate_distance(my_segment, p1);
         segment closest_segment = my_segment;
@@ -104,7 +107,8 @@ public:
             return false;
     }
     
-    void save_q_points(){ // save quadrature points to txt file
+    void save_q_points() const // save quadrature points to txt file
+    {
         std::remove("plot_q_points_on_boundary");
         std::ofstream ofs_q_points;
         ofs_q_points.open ("plot_q_points_on_boundary", std::ofstream::out | std::ofstream::app);
@@ -127,10 +131,11 @@ public:
             for (unsigned int j = 0; j <my_segment.q_points.size(); ++j)
                 q_points.insert(q_points.end(), my_segment.q_points[j]);
         }
+
         return q_points;
     }
     
-    std::vector<int> get_segment_indices_inside_cell(dealii::DoFHandler<2>::cell_iterator cell)
+    std::vector<int> get_segment_indices_inside_cell(dealii::DoFHandler<2>::cell_iterator cell) const
     {
         std::vector<int> segment_indices;
         for (unsigned int i = 0; i < segment_list.size(); ++i)
@@ -147,7 +152,7 @@ public:
     
 private:
     
-    std::vector<dealii::Point<2>> calculate_q_points(const segment my_segment)
+    std::vector<dealii::Point<2>> calculate_q_points(const segment my_segment) const
     {
         dealii::Point<2> q_point;
         std::vector<dealii::Point<2>> q_points;
@@ -157,21 +162,24 @@ private:
         q_point = my_segment.beginPoint + ((my_segment.endPoint-my_segment.beginPoint) * boundary_quadrature.get_points()[i][0]);
         q_points.insert(q_points.end(), q_point);
         }
+
+        std::cout<<"Number of quadrature points on boundary: "<<boundary_quadrature.size()<<std::endl;
         
         return q_points;
     }
 
-    std::vector<double> calculate_q_weights()
+    std::vector<double> calculate_q_weights() const
     {
         std::vector<double> q_weights;  
         for (unsigned int i = 0; i < boundary_quadrature.size(); ++i)
         {
-        q_weights.insert(q_weights.end(), 0.500);
+        q_weights.insert(q_weights.end(), boundary_quadrature.get_weights()[i]);
+        std::cout<<"Weights:"<<boundary_quadrature.get_weights()[i]<<std::endl;
         }
         return q_weights;
     }
     
-    dealii::Point<2> calculate_normals (const segment my_segment) // for polygon defined clockwise
+    dealii::Point<2> calculate_normals (const segment my_segment) const // for polygon defined clockwise
     {
         double dx, dy;
         dx = (my_segment.endPoint[0] - my_segment.beginPoint[0]) / my_segment.length;
@@ -185,7 +193,8 @@ private:
         return normalVector;
     }
     
-    double calculate_distance(const segment my_segment, const dealii::Point<2> p){
+    double calculate_distance(const segment my_segment, const dealii::Point<2> p) const
+    {
         double distance = std::abs(my_segment.beginPoint.distance(p)) +  std::abs(my_segment.endPoint.distance(p));
         return distance;
     }

@@ -1,5 +1,45 @@
-dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2>::cell_iterator cell,
-                                          const dealii::Quadrature<2>* base_quadrature)
+
+static bool cell_is_in_physical_domain(const typename dealii::DoFHandler<dim>::cell_iterator &cell);
+static bool cell_is_in_fictitious_domain(const typename dealii::DoFHandler<dim>::cell_iterator &cell);
+static bool cell_is_cut_by_boundary(const typename dealii::DoFHandler<dim>::cell_iterator &cell);
+
+enum{
+physical_domain_id, 
+fictitious_domain_id, 
+boundary_id
+};
+
+bool cell_is_in_physical_domain(const typename dealii::DoFHandler<dim>::cell_iterator &cell){
+return (cell->material_id() == physical_domain_id);
+}
+bool cell_is_in_fictitious_domain(const typename dealii::DoFHandler<dim>::cell_iterator &cell){
+return (cell->material_id() == fictitious_domain_id);
+}
+bool cell_is_cut_by_boundary(const typename dealii::DoFHandler<dim>::cell_iterator &cell){
+return (cell->material_id() == boundary_id);
+}
+
+void set_material_ids(const typename dealii::DoFHandler<dim> &dof_handler, const myPolygon my_poly)
+{
+for (typename dealii::Triangulation<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell){
+unsigned int vertex_tracker = 0;
+    for (unsigned int vertex_iterator = 0; vertex_iterator < 4; vertex_iterator ++){
+        if (my_poly.is_inside(cell->vertex(vertex_iterator)))
+            vertex_tracker++;
+    }
+    //std::cout<<"cell: "<<cell<<", vertex tracker: "<<vertex_tracker<<std::endl;
+    if (vertex_tracker == 0)
+         cell->set_material_id (fictitious_domain_id);
+    else if (vertex_tracker == 4)
+         cell->set_material_id (physical_domain_id);
+    else
+        cell->set_material_id (boundary_id);
+}
+}
+//______________________________________
+template<int dim>
+dealii::Quadrature<dim> collect_quadratures(const typename dealii::Triangulation<dim>::cell_iterator cell,
+                                          const dealii::Quadrature<dim>* base_quadrature)
 {
     if(cell->active()) // if the cell is flagged active
     {
@@ -8,21 +48,21 @@ dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2
     }
     
     // get collected quadratures of each child and merge them
-    std::vector<dealii::Point<2> > q_points;
+    std::vector<dealii::Point<dim> > q_points;
     std::vector<double> q_weights;
     for(unsigned int child = 0;
-        child < dealii::GeometryInfo<2>::max_children_per_cell;
+        child < dealii::GeometryInfo<dim>::max_children_per_cell;
         ++child)                                        // loop over all child cells
     {
         // get child
-        typename dealii::Triangulation<2>::cell_iterator child_cell =
+        typename dealii::Triangulation<dim>::cell_iterator child_cell =
                 cell->child(child);
         // collect sub-quadratures
-        dealii::Quadrature<2> childs_collected_quadratures =
+        dealii::Quadrature<dim> childs_collected_quadratures =
                 collect_quadratures(child_cell, base_quadrature);
         // project to current cell
-        dealii::Quadrature<2> child_quadrature =
-                dealii::QProjector<2>::project_to_child(childs_collected_quadratures, child);
+        dealii::Quadrature<dim> child_quadrature =
+                dealii::QProjector<dim>::project_to_child(childs_collected_quadratures, child);
         // collect resulting quadrature
         q_points.insert(q_points.end(),
                         child_quadrature.get_points().begin(),
@@ -32,7 +72,7 @@ dealii::Quadrature<2> collect_quadratures(const typename dealii::Triangulation<2
                          child_quadrature.get_weights().end());
     }
     
-    return dealii::Quadrature<2>(q_points, q_weights);
+    return dealii::Quadrature<dim>(q_points, q_weights);
 }
 //______________________________________
 dealii::Quadrature<2> collect_quadratures_on_boundary_segment(const myPolygon::segment my_segment, const typename dealii::Triangulation<2>::cell_iterator cell)
@@ -68,13 +108,13 @@ void plot_in_global_coordinates (const std::vector<dealii::Point<2>> q_points,
 
 //___________________________________________
 
-std::vector<double> get_indicator_function_values(const std::vector<dealii::Point<2> > points,
-                                                  const typename dealii::DoFHandler<2>::cell_iterator cell, myPolygon my_poly)
+std::vector<double> get_indicator_function_values(const std::vector<dealii::Point<dim> > points,
+                                                  const typename dealii::DoFHandler<dim>::cell_iterator cell, myPolygon my_poly)
 {
     std::ofstream ofs_indicator_function_values;
     ofs_indicator_function_values.open ("indicator_function_values", std::ofstream::out | std::ofstream::app);
     
-    dealii::Point<2> q_point_in_global_coordinates;
+    dealii::Point<dim> q_point_in_global_coordinates;
     std::vector<double> indicator_function_values (points.size());
     for (unsigned int i=0; i<indicator_function_values.size(); ++i)
     {
@@ -90,7 +130,7 @@ std::vector<double> get_indicator_function_values(const std::vector<dealii::Poin
     return indicator_function_values;
 }
 //_______________________________________________
-bool contains_boundary (const typename dealii::DoFHandler<2>::cell_iterator cell, myPolygon my_poly)
+bool contains_boundary (const typename dealii::Triangulation<2>::cell_iterator cell, const myPolygon my_poly)
 {
     unsigned int vertex_tracker = 0;
     for (unsigned int vertex_iterator = 0; vertex_iterator < 4; vertex_iterator ++){
