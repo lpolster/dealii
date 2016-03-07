@@ -12,7 +12,7 @@
 #include <fstream>
 
 
-dealii::QGauss<1>  boundary_quadrature(polynomial_degree+1); // quadrature on boundary
+dealii::QGauss<1>  boundary_quadrature(2*polynomial_degree); // quadrature on boundary
 
 class myPolygon
 {
@@ -162,8 +162,6 @@ private:
         q_point = my_segment.beginPoint + ((my_segment.endPoint-my_segment.beginPoint) * boundary_quadrature.get_points()[i][0]);
         q_points.insert(q_points.end(), q_point);
         }
-
-        std::cout<<"Number of quadrature points on boundary: "<<boundary_quadrature.size()<<std::endl;
         
         return q_points;
     }
@@ -174,7 +172,6 @@ private:
         for (unsigned int i = 0; i < boundary_quadrature.size(); ++i)
         {
         q_weights.insert(q_weights.end(), boundary_quadrature.get_weights()[i]);
-        std::cout<<"Weights:"<<boundary_quadrature.get_weights()[i]<<std::endl;
         }
         return q_weights;
     }

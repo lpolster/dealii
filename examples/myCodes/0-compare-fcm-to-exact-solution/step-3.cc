@@ -109,7 +109,6 @@ private:
     void setup_grid_and_boundary ();
     void refine_grid_adaptively ();
     void coarsen_grid_adaptively (int global_refinement_level);
-    double Nitsche_rhs_terms(const int q_index, const int i, FEValues<dim> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution);
 
     std::vector<dealii::Point<2>>           point_list;
     Triangulation<dim>                      triangulation_adaptiveIntegration;   // triangulation for the integration grid
@@ -165,7 +164,7 @@ void LaplaceProblem<dim>::setup_system ()
 template <int dim>
 void LaplaceProblem<dim>::assemble_system ()
 {
-    QGauss<dim>   quadrature_formula(polynomial_degree+1);
+    QGauss<dim>   quadrature_formula(2*polynomial_degree);
 
 #ifdef FCM_DEF
         my_poly.constructPolygon(point_list);                   // construct polygon from list of points
@@ -256,8 +255,6 @@ void LaplaceProblem<dim>::assemble_system ()
 #ifdef FCM_DEF
         Point<dim>      normal_vector;
         double          segment_length;
-        double          fe_values_on_boundary_segment_weight;
-        double          fe_values_on_boundary_segment_shape_value_i_q_index;
         Quadrature<dim> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
 
          if (contains_boundary(cell, my_poly))
@@ -279,32 +276,38 @@ void LaplaceProblem<dim>::assemble_system ()
 
                  for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index)
                  {
-                     fe_values_on_boundary_segment_weight = fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] * segment_length;
-
                      for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
-
-                         fe_values_on_boundary_segment_shape_value_i_q_index = fe_values_on_boundary_segment.shape_value(i,q_index);
 
                          for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
 
-                             cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment_shape_value_i_q_index *
+                             cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment.shape_value(i,q_index) *
                                                                      fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                                     fe_values_on_boundary_segment_weight);
+                                                                     fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+                                                                     segment_length);
 
-                             cell_matrix(i,j) -= (fe_values_on_boundary_segment_shape_value_i_q_index*
+                             cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index)*
+                                                      fe_values_on_boundary_segment.shape_grad(j,q_index) *
                                                       normal_vector *
-                                                      fe_values_on_boundary_segment.shape_grad(j,q_index) * //fe_values_on_boundary_segment.JxW (q_index));
-                                                      fe_values_on_boundary_segment_weight);
+                                                      fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+                                                      segment_length);
 
                              cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                      normal_vector *
                                                       fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                                                      fe_values_on_boundary_segment_weight);
+                                                      normal_vector *
+                                                      fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+                                                      segment_length);
 
                              Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
 
                          } // endfor
-                         cell_rhs(i) += Nitsche_rhs_terms(q_index, i, fe_values_on_boundary_segment, my_segment, exact_solution);
+                         cell_rhs(i) += (penalty_term * fe_values_on_boundary_segment.shape_value(i,q_index) *
+                                         exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
+                                         segment_length *
+                                         fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+                         cell_rhs(i) -= (exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
+                                         fe_values_on_boundary_segment.shape_grad(i,q_index) *
+                                         normal_vector * segment_length *
+                                         fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
 
                      } // endfor
 
@@ -343,28 +346,6 @@ void LaplaceProblem<dim>::assemble_system ()
                                         system_rhs);
 #endif
 }
-
-#ifdef FCM_DEF
-
-template<int dim>
-double LaplaceProblem<dim>::Nitsche_rhs_terms(const int q_index, const int i, FEValues<dim> &fe_values_on_boundary_segment,  myPolygon::segment my_segment, const Solution<dim> &exact_solution)
-{
-    double Nitsche_rhs_terms = 0.0;
-
-    double dirichlet_boundary_value = exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index));
-    Nitsche_rhs_terms -= (dirichlet_boundary_value * fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                          my_segment.normalVector * my_segment.length *
-                          fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-    Nitsche_rhs_terms +=  (penalty_term * fe_values_on_boundary_segment.shape_value(i,q_index) *
-                           dirichlet_boundary_value * my_segment.length *
-                           fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-
-    Assert(std::isfinite(Nitsche_rhs_terms), ExcNumberNotFinite(std::complex<double>(Nitsche_rhs_terms)));
-
-    return Nitsche_rhs_terms;
-}
-#endif
-
 
 template <int dim>
 void LaplaceProblem<dim>::solve ()
@@ -440,7 +421,7 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
                                        solution,
                                        Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<dim>(polynomial_degree+1),
+                                       QGauss<dim>(2*polynomial_degree + 4),
                                        VectorTools::L2_norm);
     const double L2_error = difference_per_cell.l2_norm();
 
@@ -471,20 +452,9 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
                                        solution,
                                        Solution<dim>(),
                                        difference_per_cell,
-                                       QGauss<dim>(polynomial_degree+1),
+                                       QGauss<dim>(2*polynomial_degree + 4),
                                        VectorTools::H1_seminorm);
     const double H1_error = difference_per_cell.l2_norm();
-
-
-    const QTrapez<1>     q_trapez;
-    const QIterated<dim> q_iterated (q_trapez, 5);
-    VectorTools::integrate_difference (dof_handler,
-                                       solution,
-                                       Solution<dim>(),
-                                       difference_per_cell,
-                                       q_iterated,
-                                       VectorTools::Linfty_norm);
-    const double Linfty_error = difference_per_cell.linfty_norm();
 
     const unsigned int n_active_cells=triangulation.n_active_cells();
     const unsigned int n_dofs=dof_handler.n_dofs();
@@ -503,7 +473,6 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
     convergence_table.add_value("dofs", n_dofs);
     convergence_table.add_value("L2", L2_error);
     convergence_table.add_value("H1", H1_error);
-    convergence_table.add_value("Linfty", Linfty_error);
 }
 
 template <int dim>
@@ -544,19 +513,21 @@ void LaplaceProblem<dim>::run ()
 #ifdef FCM_DEF
         penalty_term = polynomial_degree * (polynomial_degree+1) * (cycle+1); // 1/h may need to be calculated differently if not -1 to 1
 
-        std::cout<<"Penalty parameter: "<<penalty_term<<std::endl;
-        output_grid(triangulation_adaptiveIntegration, "globalGrid", cycle+1);
+//        std::cout<<"Penalty parameter: "<<penalty_term<<std::endl;
+//        output_grid(triangulation_adaptiveIntegration, "globalGrid", cycle+1);
 
-        refine_grid_adaptively();
-        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-1", cycle+1);
+//        refine_grid_adaptively();
+//        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-1", cycle+1);
 
-        refine_grid_adaptively();
-        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-2", cycle+1);
+//        refine_grid_adaptively();
+//        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-2", cycle+1);
 
 
-        refine_grid_adaptively();
-        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-3", cycle+1);
+//        refine_grid_adaptively();
+//        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-3", cycle+1);
 
+//        refine_grid_adaptively();
+//        output_grid(triangulation_adaptiveIntegration, "adaptiveGrid-4", cycle+1);
 #endif
 
         setup_system ();
@@ -575,9 +546,11 @@ void LaplaceProblem<dim>::run ()
         process_solution (cycle);
 
 #ifdef FCM_DEF
-        coarsen_grid_adaptively(1+cycle);
-        coarsen_grid_adaptively(1+cycle);
-        coarsen_grid_adaptively(1+cycle);
+//        coarsen_grid_adaptively(1+cycle);
+//        coarsen_grid_adaptively(1+cycle);
+//        coarsen_grid_adaptively(1+cycle);
+//        coarsen_grid_adaptively(1+cycle);
+
 #endif
     }
 
@@ -598,17 +571,14 @@ void LaplaceProblem<dim>::run ()
 
     convergence_table.set_precision("L2", 3);
     convergence_table.set_precision("H1", 3);
-    convergence_table.set_precision("Linfty", 3);
 
     convergence_table.set_scientific("L2", true);
     convergence_table.set_scientific("H1", true);
-    convergence_table.set_scientific("Linfty", true);
 
     convergence_table.set_tex_caption("cells", "\\# cells");
     convergence_table.set_tex_caption("dofs", "\\# dofs");
     convergence_table.set_tex_caption("L2", "$L^2$-error");
     convergence_table.set_tex_caption("H1", "$H^1$-error");
-    convergence_table.set_tex_caption("Linfty", "$L^\\infty$-error");
 
     convergence_table.set_tex_format("cells", "r");
     convergence_table.set_tex_format("dofs", "r");
