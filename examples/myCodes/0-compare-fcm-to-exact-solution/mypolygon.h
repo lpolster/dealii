@@ -12,7 +12,7 @@
 #include <fstream>
 
 
-dealii::QGauss<1>  boundary_quadrature(2*polynomial_degree); // quadrature on boundary
+dealii::QGauss<1>  boundary_quadrature(n_quadrature_points); // quadrature on boundary
 
 class myPolygon
 {
@@ -102,6 +102,32 @@ public:
         dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
         
         if (scalar_product(closest_segment.normalVector, point_vector) > 0) // if scalar product == 0 -> on boundary
+            return true;
+        else
+            return false;
+    }
+
+    bool is_on_boundary(const dealii::Point<dim> p1) const // test whether a point is inside the polygon
+   { 
+        segment my_segment = segment_list[0];
+        double minimum_distance = calculate_distance(my_segment, p1);
+        segment closest_segment = my_segment;
+        
+        for (unsigned int i = 1; i <segment_list.size(); ++i)
+        {
+            segment my_segment = segment_list[i];
+            double distance = calculate_distance(my_segment, p1);
+            if(distance < minimum_distance)
+            {
+                minimum_distance = distance;
+                closest_segment = my_segment;
+            }
+        }
+//        std::cout<<"Closest segment: ["<<closest_segment.beginPoint<<"] ["<<closest_segment.endPoint<<"]"<<std::endl;
+//        std::cout<<"Min Distance: "<<minimum_distance<<std::endl;
+        dealii::Point<2> point_vector =  {closest_segment.beginPoint[0] - p1[0], closest_segment.beginPoint[1] - p1[1]};
+        
+        if (scalar_product(closest_segment.normalVector, point_vector) == 0) // if scalar product == 0 -> on boundary
             return true;
         else
             return false;

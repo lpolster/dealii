@@ -120,7 +120,7 @@ std::vector<double> get_indicator_function_values(const std::vector<dealii::Poin
     {
         q_point_in_global_coordinates = mapping.transform_unit_to_real_cell (cell, points[i]);
 
-        if (my_poly.is_inside(q_point_in_global_coordinates)) // point is in physical domain (circle with radius 0.4)
+        if (my_poly.is_inside(q_point_in_global_coordinates) || my_poly.is_on_boundary(q_point_in_global_coordinates)) 
             indicator_function_values[i] = 1; // indicates physical domain
         else
             indicator_function_values[i] = alpha; // indicates fictitous domain
