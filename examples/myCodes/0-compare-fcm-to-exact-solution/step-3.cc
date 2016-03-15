@@ -120,17 +120,18 @@ private:
 
 
 template <int dim>
-LaplaceProblem<dim>::LaplaceProblem (const FiniteElement<dim> &fe) :
+LaplaceProblem<dim>::LaplaceProblem (const FiniteElement<dim> &fe) : // The constructor of the class
     dof_handler (triangulation),
     fe (&fe)
 {}
 
 template <int dim>
-LaplaceProblem<dim>::~LaplaceProblem ()
+LaplaceProblem<dim>::~LaplaceProblem () // The destructor of the class
 {
     dof_handler.clear ();
 }
-
+    
+// // // Set-up the triangulation and the polygon boundary // // //
 #ifdef FCM_DEF
 template <int dim>
 void LaplaceProblem<dim>::setup_grid_and_boundary ()
@@ -138,7 +139,6 @@ void LaplaceProblem<dim>::setup_grid_and_boundary ()
 //    point_list = {{-0.5,0.5}, {0.5, 0.5}, {0.5, -0.5}, {-0.5, -0.5}, {-0.5,0.5}};
 //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
 //    point_list = {{-0.7,0.7}, {0.7, 0.7}, {0.7, -0.7}, {-0.7, -0.7}, {-0.7,0.7}};
-
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
     point_list = {{-1.0,1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
 
@@ -152,6 +152,7 @@ void LaplaceProblem<dim>::setup_grid_and_boundary ()
 #endif
 
 
+// // // Set-up the system // // //
 template <int dim>
 void LaplaceProblem<dim>::setup_system ()
 {
@@ -167,24 +168,23 @@ void LaplaceProblem<dim>::setup_system ()
 }
 
 
+// // // Assemble the system // // //
 template <int dim>
 void LaplaceProblem<dim>::assemble_system ()
 {
-    QGauss<dim>   quadrature_formula(n_quadrature_points);
+    QGauss<dim>   quadrature_formula(n_quadrature_points); // Gauss quadrature with n quadrator points
 
 #ifdef FCM_DEF
     my_poly.constructPolygon(point_list);                   // construct polygon from list of points
-    my_poly.save_segments();
-    Quadrature<dim> collected_quadrature;                       // the quadrature rule
+    my_poly.save_segments();                                // save segments to text file for plotting
+    Quadrature<dim> collected_quadrature;                   // the quadrature rule
 
     std::remove("FCM_quadrature");
     std::remove("indicator_function_values");
-
 #endif
 
-
-    const unsigned int n_q_points    = quadrature_formula.size();
     const unsigned int dofs_per_cell = fe->dofs_per_cell;
+    const unsigned int n_q_points = quadrature_formula.size();
 
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
     Vector<double>       cell_rhs (dofs_per_cell);
@@ -217,7 +217,6 @@ void LaplaceProblem<dim>::assemble_system ()
 #endif
 
         fe_values.reinit (cell);
-
         right_hand_side.value_list (fe_values.get_quadrature_points(),
                                     rhs_values);
 
@@ -234,8 +233,7 @@ void LaplaceProblem<dim>::assemble_system ()
 
         // Assemble the cell matrix //
         for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
-            for (unsigned int i=0; i<dofs_per_cell; ++i)
-            {
+            for (unsigned int i=0; i<dofs_per_cell; ++i){
                 for (unsigned int j=0; j<dofs_per_cell; ++j){
                     double temp_matrix_entry = (fe_values.shape_grad(i,q_point) *
                                                 fe_values.shape_grad(j,q_point) *
@@ -378,17 +376,12 @@ void LaplaceProblem<dim>::refine_grid_adaptively ()
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
     myPolygon  my_poly;
     my_poly.constructPolygon(point_list);
-    typename Triangulation<dim>::active_cell_iterator // an iterator over all active cells
-            cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
+    typename Triangulation<dim>::active_cell_iterator cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
             endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
 
     for (; cell!=endc; ++cell) // loop over all active cells
-    {
         if (contains_boundary(cell, my_poly))
-        {
             cell -> set_refine_flag();
-        }
-    }
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
     point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
@@ -405,10 +398,8 @@ void LaplaceProblem<dim>::coarsen_grid_adaptively (int global_refinement_level)
             endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
 
     for (; cell!=endc; ++cell) // loop over all active cells
-    {
         if (cell->level() > global_refinement_level)
             cell -> set_coarsen_flag();
-    }
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
 }
@@ -449,11 +440,11 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
     data_out.attach_dof_handler (dof_handler);
 
 #ifdef FEM_DEF
-    data_out.add_data_vector (difference_per_cell, "FEM_difference_solution");
+    data_out.add_data_vector (difference_per_cell, "FEM_L2error_solution");
 #endif
 
 #ifdef FCM_DEF
-    data_out.add_data_vector (difference_per_cell, "FCM_difference_solution");
+    data_out.add_data_vector (difference_per_cell, "FCM_L2error_solution");
 #endif
 
     data_out.build_patches (fe->degree); // linear interpolation for plotting
@@ -461,13 +452,13 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
     std::string vtk_filename;
 
 #ifdef FEM_DEF
-    std::ofstream output_gpl ("FEM_difference_solution.gpl");
-    vtk_filename = "FEM_difference_solution";
+    std::ofstream output_gpl ("FEM_L2error_solution.gpl");
+    vtk_filename = "FEM_L2error_solution";
 #endif
 
 #ifdef FCM_DEF
-    std::ofstream output_gpl ("FCM_difference_solution.gpl");
-    vtk_filename = "FCM_difference_solution";
+    std::ofstream output_gpl ("FCM_L2error_solution.gpl");
+    vtk_filename = "FCM_L2error_solution";
 #endif
 
     vtk_filename += ".vtk";
@@ -494,6 +485,32 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
                                        VectorTools::H1_seminorm);
 #endif
     const double H1_error = difference_per_cell.l2_norm();
+    
+#ifdef FEM_DEF
+    data_out.add_data_vector (difference_per_cell, "FEM_H1error_solution");
+#endif
+    
+#ifdef FCM_DEF
+    data_out.add_data_vector (difference_per_cell, "FCM_H1error_solution");
+#endif
+    
+    data_out.build_patches (fe->degree); // linear interpolation for plotting
+    
+#ifdef FEM_DEF
+    std::ofstream output_gpl_H1 ("FEM_H1error_solution.gpl");
+    vtk_filename = "FEM_H1error_solution";
+#endif
+    
+#ifdef FCM_DEF
+    std::ofstream output_gpl_H1 ("FCM_H1error_solution.gpl");
+    vtk_filename = "FCM_H1error_solution";
+#endif
+    
+    vtk_filename += ".vtk";
+    std::ofstream output_vtk_H1 (vtk_filename.c_str());
+    
+    data_out.write_vtk (output_vtk);
+    data_out.write_gnuplot (output_gpl);
 
     const unsigned int n_active_cells=triangulation.n_active_cells();
     const unsigned int n_dofs=dof_handler.n_dofs();
@@ -540,7 +557,7 @@ void LaplaceProblem<dim>::run ()
 #endif
 
 #ifdef FEM_DEF
-            GridGenerator::hyper_cube (triangulation, -1, 1);
+            GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);
             triangulation.refine_global (1);
 #endif
 
@@ -555,20 +572,22 @@ void LaplaceProblem<dim>::run ()
         //        std::cout<<"Penalty parameter: "<<penalty_term<<std::endl;
         //        output_grid(triangulation_adaptiveIntegration, "globalGrid", cycle+1);
 
+        
+        clock_t begin = clock();
         for (unsigned int i = 0; i < n_adaptive_refinement_cycles; ++i)
         {
             refine_grid_adaptively();
 //            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i+1);
-
         }
-
+        clock_t end = clock();
+        std::cout<<"Elapsed time for adaptive refinement = " << double(end - begin) / CLOCKS_PER_SEC << std::endl;
 #endif
 
         setup_system ();
 
-        clock_t begin = clock();
+        begin = clock();
         assemble_system ();
-        clock_t end = clock();
+        end = clock();
         std::cout<<"Elapsed time for matrix assembly = " << double(end - begin) / CLOCKS_PER_SEC << std::endl;
 
         solve ();
@@ -670,8 +689,6 @@ void LaplaceProblem<dim>::run ()
 
 int main ()
 {
-    const unsigned int dim = 2;
-
     try
     {
         using namespace dealii;
