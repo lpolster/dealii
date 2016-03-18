@@ -1,4 +1,4 @@
-/* ---------------------------------------------------------------------
+ /* ---------------------------------------------------------------------
  *
  * Copyright (C) 2000 - 2015 by the deal.II authors
  *
@@ -137,13 +137,18 @@ template <int dim>
 void LaplaceProblem<dim>::setup_grid_and_boundary ()
 {
 //    point_list = {{-0.5,0.5}, {0.5, 0.5}, {0.5, -0.5}, {-0.5, -0.5}, {-0.5,0.5}};
-//    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
-//    point_list = {{-0.7,0.7}, {0.7, 0.7}, {0.7, -0.7}, {-0.7, -0.7}, {-0.7,0.7}};
+    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
+//    point_list = {{-0.7,0.7}, {0.6, 0.6}, {0.75, -0.75}, {-0.5, -0.6}, {-0.7,0.7}};
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
-    point_list = {{-1.0,1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
+//    point_list = {{-1.0,1.0}, {1.0, 1.0}, {0.0, -1.0}, {-1.0,1.0}};
+//    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
 
     GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);       // generate triangulation for solution grid
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, lower_embedded_domain, upper_embedded_domain); // generate triangulation for integration grid
+
+    triangulation.refine_global (1);
+    triangulation_adaptiveIntegration.refine_global (1);
+    point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
 
     triangulation.refine_global (1);
     triangulation_adaptiveIntegration.refine_global (1);
@@ -177,6 +182,8 @@ void LaplaceProblem<dim>::assemble_system ()
 #ifdef FCM_DEF
     my_poly.constructPolygon(point_list);                   // construct polygon from list of points
     my_poly.save_segments();                                // save segments to text file for plotting
+    my_poly.save_q_points();
+
     Quadrature<dim> collected_quadrature;                   // the quadrature rule
 
     std::remove("FCM_quadrature");
@@ -216,6 +223,7 @@ void LaplaceProblem<dim>::assemble_system ()
         std::vector<double>  rhs_values (collected_quadrature.size());
 #endif
 
+//        std::cout<<"Cell "<<cell<<" has "<<collected_quadrature.size()<<" quadrature points."<<std::endl;
         fe_values.reinit (cell);
         right_hand_side.value_list (fe_values.get_quadrature_points(),
                                     rhs_values);
@@ -260,65 +268,74 @@ void LaplaceProblem<dim>::assemble_system ()
         double          segment_length;
         Quadrature<dim> collected_quadrature_on_boundary_segment;           // quadrature rule on boundary
 
-        if (contains_boundary(cell, my_poly))
-        {
-            {
-                std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
+//        if (contains_boundary(cell, my_poly))
+//        {
+//            {
+//                std::vector<int> segment_indices = my_poly.get_segment_indices_inside_cell(cell);
 
-                for (unsigned int k = 0; k < segment_indices.size(); ++ k){
+//                for (unsigned int k = 0; k < segment_indices.size(); ++ k){
 
-                    myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
-                    segment_length = my_segment.length;
-                    normal_vector =  my_segment.normalVector;
+//                    myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
+//                    segment_length = my_segment.length;
+//                    normal_vector =  my_segment.normalVector;
 
-                    collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
+//                    collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
 
-                    FEValues<dim> fe_values_on_boundary_segment (*fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
+//                    FEValues<dim> fe_values_on_boundary_segment (*fe, collected_quadrature_on_boundary_segment, update_quadrature_points |  update_gradients |  update_values | update_JxW_values);
 
-                    fe_values_on_boundary_segment.reinit(cell);
+//                    fe_values_on_boundary_segment.reinit(cell);
 
-                    for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index) {
-                        for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
-                            for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
+//                    for (unsigned int q_index=0; q_index<my_segment.q_points.size(); ++q_index) {
+//                        for (unsigned int i=0; i<dofs_per_cell; ++i)  { // loop over degrees of freedom
+//                            for (unsigned int j=0; j<dofs_per_cell; ++j)  {// loop over degrees of freedom
 
-                                cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment.shape_value(i,q_index) *
-                                                                    fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                                    fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
-                                                                    segment_length);
+//                                cell_matrix(i,j) += penalty_term * (fe_values_on_boundary_segment.shape_value(i,q_index) *
+//                                                                    fe_values_on_boundary_segment.shape_value(j,q_index) *
+//                                                                    fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+//                                                                    segment_length);
 
-                                cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index)*
-                                                     fe_values_on_boundary_segment.shape_grad(j,q_index) *
-                                                     normal_vector *
-                                                     fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
-                                                     segment_length);
+//                                cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(i,q_index)*
+//                                                     fe_values_on_boundary_segment.shape_grad(j,q_index) *
+//                                                     normal_vector *
+//                                                     fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+//                                                     segment_length);
 
-                                cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
-                                                     fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                                                     normal_vector *
-                                                     fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
-                                                     segment_length);
+//                                cell_matrix(i,j) -= (fe_values_on_boundary_segment.shape_value(j,q_index) *
+//                                                     fe_values_on_boundary_segment.shape_grad(i,q_index) *
+//                                                     normal_vector *
+//                                                     fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index] *
+//                                                     segment_length);
 
-//                                Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
+////                                Assert(std::isfinite(cell_matrix(i,j)), ExcNumberNotFinite(std::complex<double>(cell_matrix(i,j))));
 
-                            } // endfor
-                            cell_rhs(i) += (penalty_term * fe_values_on_boundary_segment.shape_value(i,q_index) *
-                                            exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
-                                            segment_length *
-                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
-                            cell_rhs(i) -= (exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
-                                            fe_values_on_boundary_segment.shape_grad(i,q_index) *
-                                            normal_vector * segment_length *
-                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+//                            } // endfor
+//                            cell_rhs(i) += (penalty_term * fe_values_on_boundary_segment.shape_value(i,q_index) *
+//                                            exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
+//                                            segment_length *
+//                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
+//                            cell_rhs(i) -= (exact_solution.value (fe_values_on_boundary_segment.quadrature_point(q_index)) *
+//                                            fe_values_on_boundary_segment.shape_grad(i,q_index) *
+//                                            normal_vector * segment_length *
+//                                            fe_values_on_boundary_segment.get_quadrature().get_weights()[q_index]);
 
-                        } // endfor
+//                        } // endfor
 
-                    } // endfor
-                }
-            };
-        }
-
+//                    } // endfor
+//                }
+//            };
+//        }
 #endif
 
+        if (contains_boundary(cell, my_poly)){
+//            std::cout<<"Cell: "<<cell<<" ("<<i<<","<<j<<") = "<<cell_matrix(i,j)<<std::endl;
+            std::cout<<"Cell matrix of cell "<<cell<<std::endl;
+            for (unsigned int i = 0; i < 4; ++i){
+                for (unsigned int j = 0; j < 4; ++j)
+                    std::cout<<cell_matrix(i,j)<<" ";
+                std::cout<<std::endl;
+            }
+
+        }
         cell->get_dof_indices (local_dof_indices);
 
 
@@ -353,6 +370,12 @@ void LaplaceProblem<dim>::solve ()
     SparseDirectUMFPACK  A_direct;              // use direct solver
     A_direct.initialize(system_matrix);
     A_direct.vmult (solution, system_rhs);
+
+    std::ofstream ofs_system_matrix;
+    ofs_system_matrix.open("system_matrix.txt", std::ofstream::out);
+    system_matrix.print(ofs_system_matrix);
+    ofs_system_matrix.close();
+
 }
 
 
@@ -363,6 +386,7 @@ void LaplaceProblem<dim>::refine_grid_globally ()
 #ifdef FCM_DEF
     triangulation_adaptiveIntegration.refine_global(1);
     point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
+
 #endif
 
     triangulation.refine_global (1);
@@ -374,7 +398,6 @@ template <int dim>
 void LaplaceProblem<dim>::refine_grid_adaptively ()
 {
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
-    myPolygon  my_poly;
     my_poly.constructPolygon(point_list);
     typename Triangulation<dim>::active_cell_iterator cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
             endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
@@ -385,14 +408,13 @@ void LaplaceProblem<dim>::refine_grid_adaptively ()
 
     triangulation_adaptiveIntegration.execute_coarsening_and_refinement ();
     point_list = update_point_list(point_list, triangulation_adaptiveIntegration);
+
 }
 
 template <int dim>
 void LaplaceProblem<dim>::coarsen_grid_adaptively (int global_refinement_level)
 {
     // Create a vector of floats that contains information about whether the cell contains the boundary or not
-    myPolygon  my_poly;
-    my_poly.constructPolygon(point_list);
     typename Triangulation<dim>::active_cell_iterator // an iterator over all active cells
             cell = triangulation_adaptiveIntegration.begin_active(), // the first active cell
             endc = triangulation_adaptiveIntegration.end(); // one past the last active cell
@@ -485,32 +507,6 @@ void LaplaceProblem<dim>::process_solution (const unsigned int cycle)
                                        VectorTools::H1_seminorm);
 #endif
     const double H1_error = difference_per_cell.l2_norm();
-    
-#ifdef FEM_DEF
-    data_out.add_data_vector (difference_per_cell, "FEM_H1error_solution");
-#endif
-    
-#ifdef FCM_DEF
-    data_out.add_data_vector (difference_per_cell, "FCM_H1error_solution");
-#endif
-    
-    data_out.build_patches (fe->degree); // linear interpolation for plotting
-    
-#ifdef FEM_DEF
-    std::ofstream output_gpl_H1 ("FEM_H1error_solution.gpl");
-    vtk_filename = "FEM_H1error_solution";
-#endif
-    
-#ifdef FCM_DEF
-    std::ofstream output_gpl_H1 ("FCM_H1error_solution.gpl");
-    vtk_filename = "FCM_H1error_solution";
-#endif
-    
-    vtk_filename += ".vtk";
-    std::ofstream output_vtk_H1 (vtk_filename.c_str());
-    
-    data_out.write_vtk (output_vtk);
-    data_out.write_gnuplot (output_gpl);
 
     const unsigned int n_active_cells=triangulation.n_active_cells();
     const unsigned int n_dofs=dof_handler.n_dofs();
@@ -547,7 +543,7 @@ void LaplaceProblem<dim>::output_grid(const dealii::Triangulation<dim>& tria,
 template <int dim>
 void LaplaceProblem<dim>::run ()
 {
-    const unsigned int n_cycles = 6;
+    const unsigned int n_cycles = 1;
     for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
     {
         if (cycle == 0)
@@ -558,13 +554,15 @@ void LaplaceProblem<dim>::run ()
 
 #ifdef FEM_DEF
             GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);
-            triangulation.refine_global (1);
+            triangulation.refine_global (2);
 #endif
-
+            output_grid(triangulation_adaptiveIntegration, "globalGrid", 0);
 
         }
-        else
+        else{
             refine_grid_globally ();
+//        my_poly.save_q_points();
+        }
 
 #ifdef FCM_DEF
         penalty_term = polynomial_degree * (polynomial_degree+1) * (cycle+1);
@@ -577,7 +575,7 @@ void LaplaceProblem<dim>::run ()
         for (unsigned int i = 0; i < n_adaptive_refinement_cycles; ++i)
         {
             refine_grid_adaptively();
-//            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i+1);
+            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i+1);
         }
         clock_t end = clock();
         std::cout<<"Elapsed time for adaptive refinement = " << double(end - begin) / CLOCKS_PER_SEC << std::endl;

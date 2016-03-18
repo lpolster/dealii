@@ -83,21 +83,24 @@ class MaskFunction : public Function<dim>
 private:
     myPolygon poly;
     typename dealii::Triangulation<dim> tria;
+  //  const typename dealii::Triangulation<dim>* tria;
 
 public:
 
-    MaskFunction (myPolygon my_poly, const typename dealii::Triangulation<2> &triangulation) : Function<dim>() {
+    MaskFunction (myPolygon &my_poly, const typename dealii::Triangulation<2> &triangulation) : Function<dim>() {
         poly = my_poly;
+        //tria = &triangulation;
         tria.copy_triangulation(triangulation);
+
     }
 
    double value (const Point<dim>   &p, const unsigned int) const
     {
         double return_value = 0;
         std::pair<dealii::Triangulation<2>::active_cell_iterator, dealii::Point<2>> cell_around_start_point =
-                dealii::GridTools::find_active_cell_around_point (mapping, tria, p);
+                dealii::GridTools::find_active_cell_around_point (mapping, tria, p); // *tria
 
-     if (poly.is_inside(p)  /*&& (contains_boundary(cell_around_start_point.first, poly) == false)*/){
+     if (poly.is_inside(p)  && (contains_boundary(cell_around_start_point.first, poly) == false)){
 
             return_value = 1.0;
      }

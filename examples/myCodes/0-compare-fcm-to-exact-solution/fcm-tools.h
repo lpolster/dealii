@@ -71,7 +71,12 @@ dealii::Quadrature<dim> collect_quadratures(const typename dealii::Triangulation
                          child_quadrature.get_weights().begin(),
                          child_quadrature.get_weights().end());
     }
-    
+
+    double sum_of_weights = 0;
+    for (unsigned int i = 0; i < q_weights.size(); ++i)
+         sum_of_weights += q_weights[i]; // throw exception if not 1
+           
+   // std::cout<<sum_of_weights<<std::endl;
     return dealii::Quadrature<dim>(q_points, q_weights);
 }
 //______________________________________
@@ -120,6 +125,7 @@ std::vector<double> get_indicator_function_values(const std::vector<dealii::Poin
     {
         q_point_in_global_coordinates = mapping.transform_unit_to_real_cell (cell, points[i]);
 
+       // if (my_poly.is_inside(q_point_in_global_coordinates) || my_poly.is_on_boundary(q_point_in_global_coordinates)) 
         if (my_poly.is_inside(q_point_in_global_coordinates) || my_poly.is_on_boundary(q_point_in_global_coordinates)) 
             indicator_function_values[i] = 1; // indicates physical domain
         else
