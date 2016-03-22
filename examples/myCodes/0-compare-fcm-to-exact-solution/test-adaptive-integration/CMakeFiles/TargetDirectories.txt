@@ -1,0 +1,9 @@
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/test-integration.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/runclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/sign.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/strip_comments.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/run.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/info.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/debug.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/distclean.dir
+/Users/lisa/Desktop/dealii/examples/myCodes/0-compare-fcm-to-exact-solution/test-adaptive-integration/CMakeFiles/release.dir
