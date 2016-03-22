@@ -12,8 +12,7 @@
 #include <fstream>
 
 
-//dealii::QGauss<1>  boundary_quadrature(n_quadrature_points); // quadrature on boundary
-dealii::QGauss<1>  boundary_quadrature(2); // quadrature on boundary
+dealii::QGauss<1>  boundary_quadrature(n_quadrature_points); // quadrature on boundary
 
 class myPolygon
 {
@@ -31,6 +30,7 @@ public:
     myPolygon(){ }
 
     void constructPolygon(const std::vector<dealii::Point<2>> point_list){
+        segment_list.clear();
         for (unsigned int i = 0; i < point_list.size()-1; ++i)
         {
             segment my_segment;
@@ -82,41 +82,41 @@ public:
         ofs_poly.close();
     }
 
-    int point_in_polygon(const dealii::Point<dim> p){ // https://de.wikipedia.org/wiki/Punkt-in-Polygon-Test_nach_Jordan
-        int return_value = -1;
-        for (unsigned int i = 0; i <segment_list.size(); ++i){
-            segment my_segment = segment_list[i];
-            return_value = return_value * cross_prod_test(p, my_segment.beginPoint, my_segment.endPoint);
-        }
-    return return_value;
-    }
-
-    int cross_prod_test(dealii::Point<dim> p, dealii::Point<dim> segment_begin,  dealii::Point<dim> segment_end){
-        int return_value;
-        if (p[1] = segment_begin[1] = segment_end[1]){
-            if (segment_begin[0] <= p[0] <= segment_end[0] || segment_end[0] <= p[0] <= segment_begin[0])
-                return_value = 0; // on boundary
-            else
-                return_value = 1;} // inside
-
-        if (segment_begin[1] > segment_end[1]){
-            dealii::Point<dim> temp = segment_begin;
-            segment_begin = segment_end;
-            segment_end = temp;}
-
-        if (p[1] = segment_begin[1] && p[0] == segment_begin[0])
-            return_value = 0; // on boundary
-        if (p[1] <= segment_begin[1] || p[1] > segment_end[1])
-            return_value = 1; // inside
-        int delta = (segment_begin[0] - p[0]) * (segment_end[1]- p[1])- (segment_begin[1] - p[1]) * (segment_end[0] - p[0]);
-        if (delta > 0)
-            return_value = -1; // outside
-        else if (delta < 0)
-            return_value = 1; // inside
-        else
-            return_value = 0; // on boundary
-       return return_value;
-    }
+//    int point_in_polygon(const dealii::Point<dim> p){ // https://de.wikipedia.org/wiki/Punkt-in-Polygon-Test_nach_Jordan // not working yet
+//        int return_value = -1;
+//        for (unsigned int i = 0; i <segment_list.size(); ++i){
+//            segment my_segment = segment_list[i];
+//            return_value = return_value * cross_prod_test(p, my_segment.beginPoint, my_segment.endPoint);
+//        }
+//    return return_value;
+//    }
+//
+//    int cross_prod_test(dealii::Point<dim> p, dealii::Point<dim> segment_begin,  dealii::Point<dim> segment_end){
+//        int return_value;
+//        if (p[1] = segment_begin[1] = segment_end[1]){
+//            if (segment_begin[0] <= p[0] <= segment_end[0] || segment_end[0] <= p[0] <= segment_begin[0])
+//                return_value = 0; // on boundary
+//            else
+//                return_value = 1;} // inside
+//
+//        if (segment_begin[1] > segment_end[1]){
+//            dealii::Point<dim> temp = segment_begin;
+//            segment_begin = segment_end;
+//            segment_end = temp;}
+//
+//        if (p[1] = segment_begin[1] && p[0] == segment_begin[0])
+//            return_value = 0; // on boundary
+//        if (p[1] <= segment_begin[1] || p[1] > segment_end[1])
+//            return_value = 1; // inside
+//        int delta = (segment_begin[0] - p[0]) * (segment_end[1]- p[1])- (segment_begin[1] - p[1]) * (segment_end[0] - p[0]);
+//        if (delta > 0)
+//            return_value = -1; // outside
+//        else if (delta < 0)
+//            return_value = 1; // inside
+//        else
+//            return_value = 0; // on boundary
+//       return return_value;
+//    }
 
 
     bool is_inside(const dealii::Point<dim> p1) const // test whether a point is inside the polygon

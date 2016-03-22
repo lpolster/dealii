@@ -112,7 +112,6 @@ void plot_in_global_coordinates (const std::vector<dealii::Point<2>> q_points,
 }
 
 //___________________________________________
-
 std::vector<double> get_indicator_function_values(const std::vector<dealii::Point<dim> > points,
                                                   const typename dealii::DoFHandler<dim>::cell_iterator cell, myPolygon my_poly)
 {
@@ -165,7 +164,7 @@ std::vector<dealii::Point<2>> update_point_list (const std::vector<dealii::Point
                 cell_around_start_point = dealii::GridTools::find_active_cell_around_point (mapping, triangulation, start_point);
 
         std::pair<dealii::Triangulation<2>::active_cell_iterator, dealii::Point<2> >
-                cell_around_end_point = dealii::GridTools::find_active_cell_around_point (mapping, triangulation,end_point);
+                cell_around_end_point = dealii::GridTools::find_active_cell_around_point (mapping, triangulation, end_point);
 
 #ifdef MY_DEBUG_DEF
         std::cout<<"["<<start_point<<"], ["<<end_point<<"]"<<std::endl;

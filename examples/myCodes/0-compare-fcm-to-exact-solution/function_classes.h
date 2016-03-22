@@ -100,7 +100,7 @@ public:
         std::pair<dealii::Triangulation<2>::active_cell_iterator, dealii::Point<2>> cell_around_start_point =
                 dealii::GridTools::find_active_cell_around_point (mapping, tria, p); // *tria
 
-     if (poly.is_inside(p)  && (contains_boundary(cell_around_start_point.first, poly) == false)){
+     if (poly.is_inside(p)  /*&& (contains_boundary(cell_around_start_point.first, poly) == false)*/){
 
             return_value = 1.0;
      }
