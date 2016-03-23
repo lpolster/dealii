@@ -46,6 +46,7 @@
 #include <deal.II/lac/sparsity_pattern.h>
 
 #include <deal.II/base/smartpointer.h>
+#include <cstdlib>
 
 // for function VectorTools::integrate_difference()
 // and ConvergenceTable:
@@ -121,6 +122,7 @@ private:
 
 template <int dim>
 LaplaceProblem<dim>::LaplaceProblem (const FiniteElement<dim> &fe) : // The constructor of the class
+    triangulation_adaptiveIntegration(Triangulation<dim>::none),
     dof_handler (triangulation),
     fe (&fe)
 {}
@@ -138,9 +140,9 @@ void LaplaceProblem<dim>::setup_grid_and_boundary ()
 {
 //   point_list = {{-0.5,0.5}, {0.5, 0.5}, {0.5, -0.5}, {-0.5, -0.5}, {-0.5,0.5}};
 //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
-    point_list = {{-0.7,0.7}, {0.6, 0.6}, {0.75, -0.75}, {-0.7, -0.6}, {-0.7,0.7}};
+//    point_list = {{-0.7,0.7}, {0.6, 0.6}, {0.75, -0.75}, {-0.7, -0.6}, {-0.7,0.7}};
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
-//    point_list = {{-1.0,1.0}, {1.0, 1.0}, {0.0, -1.0}, {-1.0,1.0}};
+    point_list = {{-0.7,0.7}, {0.7, 0.7}, {0.0, -0.7}, {-0.7,0.7}};
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
 
     GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);       // generate triangulation for solution grid
@@ -275,7 +277,7 @@ void LaplaceProblem<dim>::assemble_system ()
 
                     myPolygon::segment my_segment = my_poly.segment_list[segment_indices[k]];
                     segment_length = my_segment.length;
-                    std::cout<<"Cell "<<cell<<" contains segment ["<<my_segment.beginPoint<<" "<<my_segment.endPoint<<"]"<<std::endl;
+//                    std::cout<<"Cell "<<cell<<" contains segment ["<<my_segment.beginPoint<<" "<<my_segment.endPoint<<"]"<<std::endl;
                     normal_vector =  my_segment.normalVector;
 
                     collected_quadrature_on_boundary_segment = collect_quadratures_on_boundary_segment(my_segment, cell);
@@ -325,16 +327,16 @@ void LaplaceProblem<dim>::assemble_system ()
         }
 #endif
 
-        if (contains_boundary(cell, my_poly)){
-//            std::cout<<"Cell: "<<cell<<" ("<<i<<","<<j<<") = "<<cell_matrix(i,j)<<std::endl;
-            std::cout<<"Cell matrix of cell "<<cell<<std::endl;
-            for (unsigned int i = 0; i < 4; ++i){
-                for (unsigned int j = 0; j < 4; ++j)
-                    std::cout<<cell_matrix(i,j)<<" ";
-                std::cout<<std::endl;
-            }
+//        if (contains_boundary(cell, my_poly)){
+////            std::cout<<"Cell: "<<cell<<" ("<<i<<","<<j<<") = "<<cell_matrix(i,j)<<std::endl;
+//            std::cout<<"Cell matrix of cell "<<cell<<std::endl;
+//            for (unsigned int i = 0; i < 4; ++i){
+//                for (unsigned int j = 0; j < 4; ++j)
+//                    std::cout<<cell_matrix(i,j)<<" ";
+//                std::cout<<std::endl;
+//            }
 
-        }
+//        }
         cell->get_dof_indices (local_dof_indices);
 
 
@@ -538,7 +540,7 @@ void LaplaceProblem<dim>::output_grid(const dealii::Triangulation<dim>& tria,
 template <int dim>
 void LaplaceProblem<dim>::run ()
 {
-    const unsigned int n_cycles = 6;
+    const unsigned int n_cycles = 3;
     for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
     {
         if (cycle == 0)
@@ -551,7 +553,7 @@ void LaplaceProblem<dim>::run ()
             GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);
             triangulation.refine_global (2);
 #endif
-            //output_grid(triangulation_adaptiveIntegration, "globalGrid", 0);
+           output_grid(triangulation_adaptiveIntegration, "globalGrid", 0);
 
         }
         else{
@@ -570,7 +572,7 @@ void LaplaceProblem<dim>::run ()
         for (unsigned int i = 0; i < n_adaptive_refinement_cycles; ++i)
         {
             refine_grid_adaptively();
-           // output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", i+1);
+            output_grid(triangulation_adaptiveIntegration, "adaptiveGrid", cycle);
         }
         clock_t end = clock();
         std::cout<<"Elapsed time for adaptive refinement = " << double(end - begin) / CLOCKS_PER_SEC << std::endl;
@@ -693,6 +695,7 @@ int main ()
         deallog.depth_console (0);
 
         {
+            std::srand(0);
             FE_Q<dim> fe(polynomial_degree);
             LaplaceProblem<dim> helmholtz_problem_2d (fe);
 

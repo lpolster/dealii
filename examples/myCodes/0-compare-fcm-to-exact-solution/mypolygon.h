@@ -35,8 +35,10 @@ public:
         {
             segment my_segment;
             my_segment.beginPoint = point_list[i];
+            my_segment.beginPoint[0] += (std::rand() % 10 +1)/10.3/std::pow(2,5);
+std::cout<<  (std::rand() % 10 +1)/10.0<<std::endl;
             my_segment.endPoint = point_list[i+1];
-            my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint)); assert(my_segment.length > 0);
+            my_segment.length = std::abs(my_segment.beginPoint.distance(my_segment.endPoint)); /*assert(my_segment.length > 0)*/;
             my_segment.q_points = calculate_q_points(my_segment);
             my_segment.q_weights = calculate_q_weights();
             my_segment.normalVector = calculate_normals(my_segment);
@@ -76,9 +78,10 @@ public:
         {
             segment my_segment = segment_list[i];
             ofs_poly<<my_segment.beginPoint<<std::endl;
+            ofs_poly<<my_segment.endPoint<<std::endl;
         }
-        segment end_segment = segment_list[segment_list.size()-1];
-        ofs_poly<<end_segment.endPoint<<std::endl;
+        //segment end_segment = segment_list[segment_list.size()-1];
+        //ofs_poly<<end_segment.endPoint<<std::endl;
         ofs_poly.close();
     }
 
