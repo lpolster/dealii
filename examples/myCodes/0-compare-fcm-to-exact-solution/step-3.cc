@@ -142,8 +142,10 @@ void LaplaceProblem<dim>::setup_grid_and_boundary ()
 //    point_list = {{-0.9,0.9}, {0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}, {-0.9,0.9}};
 //    point_list = {{-0.7,0.7}, {0.6, 0.6}, {0.75, -0.75}, {-0.7, -0.6}, {-0.7,0.7}};
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
-    point_list = {{-0.7,0.7}, {0.7, 0.7}, {0.0, -0.7}, {-0.7,0.7}};
+//    point_list = {{-0.7,0.7}, {0.7, 0.7}, {0.0, -0.7}, {-0.7,0.7}};
 //    point_list = {{-1.0,1.0}, {1.0, 1.0}, {1.0, -1.0}, {-1.0, -1.0}, {-1.0,1.0}};
+
+        point_list = {{-1.0,1.0}, {1.0, 1.0}, {0.0, -1.0}, {-1.0,1.0}};
 
     GridGenerator::hyper_cube (triangulation, lower_embedded_domain, upper_embedded_domain);       // generate triangulation for solution grid
     GridGenerator::hyper_cube (triangulation_adaptiveIntegration, lower_embedded_domain, upper_embedded_domain); // generate triangulation for integration grid
@@ -540,7 +542,7 @@ void LaplaceProblem<dim>::output_grid(const dealii::Triangulation<dim>& tria,
 template <int dim>
 void LaplaceProblem<dim>::run ()
 {
-    const unsigned int n_cycles = 3;
+    const unsigned int n_cycles = 5;
     for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
     {
         if (cycle == 0)
