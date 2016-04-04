@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+   <FileVersion major="1" minor="6" />
+   <Project>
+      <Option title="heat-transport" />
+      <Option makefile_is_custom="1" />
+      <Option compiler="gcc" />
+      <Option virtualFolders="CMake Files\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\dealii\;CMake Files\..\..\dealii\build\;CMake Files\..\..\dealii\build\lib\;CMake Files\..\..\dealii\build\lib\cmake\;CMake Files\..\..\dealii\build\lib\cmake\deal.II\;CMake Files\..\..\dealii\build\share\;CMake Files\..\..\dealii\build\share\deal.II\;CMake Files\..\..\dealii\build\share\deal.II\macros\;" />
+      <Build>
+      <Target title="all">
+         <Option working_dir="/Users/lisa/Desktop/code/heat-transport-build" />
+         <Option type="4" />
+         <MakeCommands>
+            <Build command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 all" />
+            <CompileFile command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;" />
+            <Clean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+            <DistClean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+         </MakeCommands>
+      </Target>
+      <Target title="edit_cache">
+         <Option working_dir="/Users/lisa/Desktop/code/heat-transport-build" />
+         <Option type="4" />
+         <MakeCommands>
+            <Build command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 edit_cache" />
+            <CompileFile command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;" />
+            <Clean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+            <DistClean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+         </MakeCommands>
+      </Target>
+      <Target title="rebuild_cache">
+         <Option working_dir="/Users/lisa/Desktop/code/heat-transport-build" />
+         <Option type="4" />
+         <MakeCommands>
+            <Build command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 rebuild_cache" />
+            <CompileFile command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;" />
+            <Clean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+            <DistClean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+         </MakeCommands>
+      </Target>
+      <Target title="heat-transport">
+         <Option output="/Users/lisa/Desktop/code/heat-transport-build/heat-transport" prefix_auto="0" extension_auto="0" />
+         <Option working_dir="/Users/lisa/Desktop/code/heat-transport-build" />
+         <Option object_output="./" />
+         <Option type="1" />
+         <Option compiler="gcc" />
+         <Compiler>
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1" />
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../lib/clang/6.0/include" />
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include" />
+            <Add directory="/Library/Frameworks" />
+            <Add directory="/System/Library/Frameworks" />
+            <Add directory="/usr/include" />
+            <Add directory="/usr/local/include" />
+         </Compiler>
+         <MakeCommands>
+            <Build command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 heat-transport" />
+            <CompileFile command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;" />
+            <Clean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+            <DistClean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+         </MakeCommands>
+      </Target>
+      <Target title="heat-transport/fast">
+         <Option output="/Users/lisa/Desktop/code/heat-transport-build/heat-transport" prefix_auto="0" extension_auto="0" />
+         <Option working_dir="/Users/lisa/Desktop/code/heat-transport-build" />
+         <Option object_output="./" />
+         <Option type="1" />
+         <Option compiler="gcc" />
+         <Compiler>
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1" />
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../lib/clang/6.0/include" />
+            <Add directory="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include" />
+            <Add directory="/Library/Frameworks" />
+            <Add directory="/System/Library/Frameworks" />
+            <Add directory="/usr/include" />
+            <Add directory="/usr/local/include" />
+         </Compiler>
+         <MakeCommands>
+            <Build command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 heat-transport/fast" />
+            <CompileFile command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;" />
+            <Clean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+            <DistClean command="/usr/bin/make -f &quot;/Users/lisa/Desktop/code/heat-transport-build/Makefile&quot;  VERBOSE=1 clean" />
+         </MakeCommands>
+      </Target>
+      </Build>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/heat-transport.cpp">
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/laplaceproblemfem.cpp">
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/laplaceproblemfem.h">
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/CMakeLists.txt">
+          <Option virtualFolder="CMake Files\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/lib/cmake/deal.II/deal.IIConfigVersion.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\lib\cmake\deal.II\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/lib/cmake/deal.II/deal.IIConfig.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\lib\cmake\deal.II\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_add_test.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_initialize_cached_variables.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_invoke_autopilot.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_pickup_tests.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_query_git_information.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+      <Unit filename="/Users/lisa/Desktop/code/heat-transport/../../dealii/build/share/deal.II/macros/macro_deal_ii_setup_target.cmake">
+          <Option virtualFolder="CMake Files\..\..\dealii\build\share\deal.II\macros\" />
+      </Unit>
+   </Project>
+</CodeBlocks_project_file>
